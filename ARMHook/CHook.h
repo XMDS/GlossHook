@@ -20,6 +20,7 @@ namespace ARMHook
 	public:
 		static uintptr_t GetLibraryAddress(const char* library);
 		static uintptr_t GetLibraryLength(const char* library);
+		static void* GetLibHandle(const char* library);
 		static const char* GetLibraryFilePath(uintptr_t LibAddr);
 		static uintptr_t GetSymbolAddress(void* handle, const char* name);
 		static uintptr_t GetSymbolAddress(uintptr_t LibAddr, const char* name);

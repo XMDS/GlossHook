@@ -49,6 +49,11 @@ namespace ARMHook
         return end_address - address;
     }
 
+    void* CHook::GetLibHandle(const char* library)
+    {
+        return dlopen(library, RTLD_NOLOAD);
+    }
+
     const char* CHook::GetLibraryFilePath(uintptr_t LibAddr)
     {
         Dl_info info;
@@ -64,10 +69,9 @@ namespace ARMHook
 
     uintptr_t CHook::GetSymbolAddress(uintptr_t LibAddr, const char* name)
     {
-        Dl_info info;
-        if (dladdr((void*)LibAddr, &info) == 0)
-            return 0;
-        return (uintptr_t)dlsym(info.dli_fbase, name);
+        if (void* lib = GetLibHandle(GetLibraryFilePath(LibAddr)))
+            return (uintptr_t)dlsym(lib, name);
+        return 0;
     }
     
     int CHook::unprotect(uintptr_t addr, size_t len)
