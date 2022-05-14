@@ -1,14 +1,8 @@
 #pragma once
 #include "Assembly/UsefulMacros.h"
+#include "Assembly/InstructionType.h"
 #include <stdint.h>
 #include <vector>
-
-enum eInstructionSet
-{
-	INSTRUCTION_SET_UNDEFINED,
-	INSTRUCTION_SET_ARM,
-	INSTRUCTION_SET_THUMB,
-};
 
 namespace ARMHook
 {
@@ -30,5 +24,13 @@ namespace ARMHook
 		static void RedirectCode(eInstructionSet sourceInstructionSet, uintptr_t dwAddress, uintptr_t to);
 		static void RedirectCodeEx(eInstructionSet sourceInstructionSet, uintptr_t dwAddress, const void* to);
 		static void RedirectFunction(uintptr_t functionJumpAddress, void* to);
+
+		static void SetTrampolinesHook(uintptr_t addr, int32_t num_trampolines);
+		static void TrampolinesRedirectCall(eInstructionSet sourceInstructionSet, uintptr_t addr, void* func, void** orig_func, InstructionType CallType);
+
+	private:
+		static uintptr_t Trampolines_addr_start;
+		static uintptr_t Trampolines_addr_end;
+		static void CheckTrampolinesLimit();
 	};
 }

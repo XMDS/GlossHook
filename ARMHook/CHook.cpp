@@ -1,26 +1,8 @@
 #include "CHook.h"
-#include <android/log.h>
+#include <unistd.h>
 #include <dlfcn.h>
 #include <ctype.h>
-#include <unistd.h>
 #include "Substrate/CydiaSubstrate.h"
-
-#define HOOK_PROC_THUMB "\x01\xB4\x01\xB4\x01\x48\x01\x90\x01\xBD\x00\xBF\x00\x00\x00\x00"
-/*
-push{ r0 }
-push{ r0 }
-ldr r0, [pc, #4]
-str r0, [sp, #4]
-pop{ r0, pc }
-nop
-func
-*/
-#define HOOK_PROC_ARM "\x04\xF0\x1F\xE5\x00\x00\x00\x00" //ldr pc, [pc, #-4] func
-
-uintptr_t hook_addr_start = 0;
-uintptr_t hook_addr_end = 0;
-uintptr_t arm_mmap_start = 0;
-uintptr_t arm_mmap_end = 0;
 
 namespace ARMHook
 {
@@ -457,7 +439,7 @@ namespace ARMHook
         int32_t a = (hex & 0xFFFFFF) << 2;
         if (type == BLX_ARM)
             a = a | ((hex & 0x1000000) >> 23);
-        else if (type == B_ARM || type == BLX_ARM)
+        else if (type == B_ARM || type == BL_ARM)
             goto xxx;
         else
             return 0;
@@ -476,14 +458,14 @@ namespace ARMHook
             {
                 uint16_t high;
                 uint16_t low;
-            }bit;
+            } bit;
             uint32_t hex32;
-        }code;
+        } code;
 
         if (isThumb32)
         {
             ReadMemory((void*)addr, &code.bit.high, 2);
-            ReadMemory((void*)addr, &code.bit.low, 2);
+            ReadMemory((void*)(addr + 2), &code.bit.low, 2);
             code.hex32 = (code.bit.high << 16) | code.bit.low;
             if (((code.hex32 & 0xF800D000) == 0xF0008000) && ((code.hex32 & 0x03800000u) != 0x03800000u))
                 return BW_COND_THUMB32;
@@ -551,8 +533,7 @@ namespace ARMHook
         else
             return UNDEFINE;
     }
-
-
+    
     bool compareData(const uint8_t* data, const bytePattern::byteEntry* pattern, size_t patternlength)
     {
         int index = 0;
@@ -638,14 +619,27 @@ namespace ARMHook
         return (uintptr_t)0;
     }
 
-    
+ /*
+    //Old Trampolines hook
+
+#define HOOK_PROC_THUMB "\x01\xB4\x01\xB4\x01\x48\x01\x90\x01\xBD\x00\xBF\x00\x00\x00\x00"
+    /*
+    push{ r0 }
+    push{ r0 }
+    ldr r0, [pc, #4]
+    str r0, [sp, #4]
+    pop{ r0, pc }
+    nop
+    func
+    */ /*
+#define HOOK_PROC_ARM "\x04\xF0\x1F\xE5\x00\x00\x00\x00" //ldr pc, [pc, #-4] func
+
+    uintptr_t hook_addr_start = 0;
+    uintptr_t hook_addr_end = 0;
+    uintptr_t arm_mmap_start = 0;
+    uintptr_t arm_mmap_end = 0;
 
 
-
-
-
-
-    //Trampolines hook
     uintptr_t CHook::InitialiseTrampolines(uintptr_t addr, size_t size)
     {
         hook_addr_start = addr;
@@ -754,7 +748,6 @@ namespace ARMHook
         *(uint32_t*)&code2[4] = ((uintptr_t)func_to | 1);
         WriteMemory((void*)hook_addr_start, code2, 8);
         hook_addr_start += 16;
-    }
+    }*/
 
-    
 }

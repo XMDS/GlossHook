@@ -121,7 +121,7 @@ ASM_LOAD_ADDRESS_OF_SYMBOL(R0, symbol) \
 #ifdef __arm__
 // Instruction set
 #define GET_CODE_START(address) ((uintptr_t)(address) & (~1))
-#define GET_INSTRUCTION_SET_FROM_ADDRESS(address) (address & 1 ? INSTRUCTION_SET_THUMB : INSTRUCTION_SET_ARM)
+#define GET_INSTRUCTION_SET_FROM_ADDRESS(address) (address & 1 ? SET_THUMB : SET_ARM)
 
 #define ASM_GET_ARM_ADDRESS_FOR_JUMP(address) address
 #define ASM_GET_THUMB_ADDRESS_FOR_JUMP(address) (address | 1)

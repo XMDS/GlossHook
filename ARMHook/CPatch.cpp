@@ -1,6 +1,7 @@
 #include "CPatch.h"
-#include "CHook.h"
 #include <unistd.h>
+#include <android/log.h>
+#include "CHook.h"
 
 namespace ARMHook
 {
@@ -71,11 +72,12 @@ namespace ARMHook
 	
 	void CPatch::NOP(eInstructionSet sourceInstructionSet, uintptr_t dwAddress, int iSize)
 	{
-		if (sourceInstructionSet == INSTRUCTION_SET_THUMB)
+		if (sourceInstructionSet == SET_THUMB)
 			return CHook::MakeThumbNOP(dwAddress, iSize);
-
-		else if (sourceInstructionSet == INSTRUCTION_SET_ARM)
+		else if (sourceInstructionSet == SET_ARM)
 			return CHook::MakeArmNOP(dwAddress, iSize);
+		else
+			return;
 	}
 
 	void CPatch::RedirectCode(eInstructionSet sourceInstructionSet, uintptr_t dwAddress, uintptr_t to)
@@ -87,7 +89,7 @@ namespace ARMHook
 	void CPatch::RedirectCodeEx(eInstructionSet sourceInstructionSet, uintptr_t dwAddress, const void* to)
 	{
 		// Thumb trampoline may take 8 bytes (if address is aligned to value of 4) or 10 bytes.
-		if (sourceInstructionSet == INSTRUCTION_SET_THUMB)
+		if (sourceInstructionSet == SET_THUMB)
 		{
 			char code[12];
 			unsigned int sizeOfData = 0;
@@ -109,7 +111,7 @@ namespace ARMHook
 
 			WriteDataToMemory(dwAddress, code, sizeOfData);
 		}
-		else if (sourceInstructionSet == INSTRUCTION_SET_ARM)
+		else if (sourceInstructionSet == SET_ARM)
 		{
 			char code[8];
 
@@ -119,12 +121,95 @@ namespace ARMHook
 		}
 	}
 
-	void CPatch::RedirectFunction(uintptr_t functionJumpAddress, void* to)
+	void CPatch::RedirectFunction(uintptr_t addr, void* func)
 	{
 		RedirectCodeEx(
-			GET_INSTRUCTION_SET_FROM_ADDRESS(functionJumpAddress),
-			GET_CODE_START(functionJumpAddress),
-			to
+			GET_INSTRUCTION_SET_FROM_ADDRESS(addr),
+			GET_CODE_START(addr),
+			func
 		);
+	}
+
+	//Trampolines Hook
+	uintptr_t CPatch::Trampolines_addr_start = 0;
+	uintptr_t CPatch::Trampolines_addr_end = 0;
+	
+	void CPatch::SetTrampolinesHook(uintptr_t addr, int32_t num_trampolines)
+	{
+		while (addr % 4) addr += 1;
+		Trampolines_addr_start = addr;
+		Trampolines_addr_end = Trampolines_addr_start + num_trampolines * 8;
+	}
+	
+	void CPatch::CheckTrampolinesLimit()
+	{
+		while (CHook::GetThumbInstructionType(Trampolines_addr_start, true) == LDRW_THUMB32 || CHook::GetArmInstructionType(Trampolines_addr_start) == LDR_ARM)
+			Trampolines_addr_start += 8;
+		
+		if (Trampolines_addr_start == 0 || Trampolines_addr_end == 0 || Trampolines_addr_end < (Trampolines_addr_start + 8))
+		{
+			__android_log_write(ANDROID_LOG_ERROR, "ARMHook", "Error!!! Trampolines Space limit reached.");
+			exit(1);
+		}
+	}
+
+	void CPatch::TrampolinesRedirectCall(eInstructionSet sourceInstructionSet, uintptr_t addr, void* func, void** orig_func, InstructionType CallType)
+	{
+		CPatch::CheckTrampolinesLimit();
+		uintptr_t naddr = GET_CODE_START(Trampolines_addr_start);
+		if (sourceInstructionSet == SET_THUMB)
+		{
+			addr = GET_CODE_START(addr);
+			InstructionType type = CHook::GetThumbInstructionType(addr, true);
+			if (type == BW_THUMB32 || type == BL_THUMB32)
+			{
+				if (orig_func != NULL)
+					*orig_func = (void*)ASM_GET_THUMB_ADDRESS_FOR_JUMP(CHook::GetThumbCallAddr(addr));
+			}
+			else if (type == BLX_THUMB32)
+			{
+				if (orig_func != NULL)
+					*orig_func = (void*)ASM_GET_ARM_ADDRESS_FOR_JUMP(CHook::GetThumbCallAddr(addr));
+			}
+			else
+				return;
+			
+			if (CallType == BL_THUMB32) {
+				CHook::MakeThumbBL(addr, naddr);
+				sourceInstructionSet = SET_THUMB;
+			}
+			else if (CallType == BLX_THUMB32) {
+				CHook::MakeThumbBLX(addr, naddr);
+				sourceInstructionSet = SET_ARM;
+			}
+			else
+				return;
+			
+			RedirectCode(sourceInstructionSet, naddr, ASM_GET_THUMB_ADDRESS_FOR_JUMP((uintptr_t)func));
+		}
+		else if (sourceInstructionSet == SET_ARM)
+		{
+			InstructionType type = CHook::GetArmInstructionType(addr);
+			if (type == B_ARM || type == BL_ARM)
+			{
+				if (orig_func != NULL)
+					*orig_func = (void*)ASM_GET_ARM_ADDRESS_FOR_JUMP(CHook::GetArmCallAddr(addr));
+			}
+			else if (type == BLX_ARM)
+			{
+				if (orig_func != NULL)
+					*orig_func = (void*)ASM_GET_THUMB_ADDRESS_FOR_JUMP(CHook::GetArmCallAddr(addr));
+			}
+			else
+				return;
+			
+			CHook::MakeArmBL(addr, naddr);
+			sourceInstructionSet = SET_ARM;
+			RedirectCode(sourceInstructionSet, naddr, ASM_GET_ARM_ADDRESS_FOR_JUMP((uintptr_t)func));
+		}
+		else
+			return;
+		
+		Trampolines_addr_start += 8;
 	}
 }
