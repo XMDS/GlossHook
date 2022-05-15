@@ -173,8 +173,12 @@ namespace ARMHook
 			}
 			else
 				return;
-			
-			if (CallType == BL_THUMB32) {
+
+			if (CallType == BW_THUMB32) {
+				CHook::MakeThumbB_W(addr, naddr);
+				sourceInstructionSet = SET_THUMB;
+			}
+			else if (CallType == BL_THUMB32) {
 				CHook::MakeThumbBL(addr, naddr);
 				sourceInstructionSet = SET_THUMB;
 			}
@@ -202,14 +206,35 @@ namespace ARMHook
 			}
 			else
 				return;
-			
-			CHook::MakeArmBL(addr, naddr);
-			sourceInstructionSet = SET_ARM;
+
+			if (CallType == B_ARM)
+			{
+				CHook::MakeArmB(addr, naddr);
+				sourceInstructionSet = SET_ARM;
+			}
+			else if (CallType == BL_ARM || CallType == BLX_ARM)
+			{
+				CHook::MakeArmBL(addr, naddr);
+				sourceInstructionSet = SET_ARM;
+			}
+			else
+				return;
+
 			RedirectCode(sourceInstructionSet, naddr, ASM_GET_ARM_ADDRESS_FOR_JUMP((uintptr_t)func));
 		}
 		else
 			return;
 		
 		Trampolines_addr_start += 8;
+	}
+
+	void ARMHook::CPatch::TrampolinesRedirectJump(eInstructionSet sourceInstructionSet, uintptr_t addr, void* func, void** orig_func)
+	{
+		if (sourceInstructionSet == SET_THUMB)
+			TrampolinesRedirectCall(sourceInstructionSet, addr, func, orig_func, BW_THUMB32);
+		else if (sourceInstructionSet == SET_ARM)
+			TrampolinesRedirectCall(sourceInstructionSet, addr, func, orig_func, B_ARM);
+		else
+			return;
 	}
 }

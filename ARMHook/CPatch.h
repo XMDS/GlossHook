@@ -27,6 +27,7 @@ namespace ARMHook
 
 		static void SetTrampolinesHook(uintptr_t addr, int32_t num_trampolines);
 		static void TrampolinesRedirectCall(eInstructionSet sourceInstructionSet, uintptr_t addr, void* func, void** orig_func, InstructionType CallType);
+		static void TrampolinesRedirectJump(eInstructionSet sourceInstructionSet, uintptr_t addr, void* func, void** orig_func);
 
 	private:
 		static uintptr_t Trampolines_addr_start;

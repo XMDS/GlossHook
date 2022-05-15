@@ -70,7 +70,7 @@ namespace ARMHook
     uintptr_t CHook::GetSymbolAddress(uintptr_t LibAddr, const char* name)
     {
         if (void* lib = GetLibHandle(GetLibraryFilePath(LibAddr)))
-            return (uintptr_t)dlsym(lib, name);
+            return GetSymbolAddress(lib, name);
         return 0;
     }
     
