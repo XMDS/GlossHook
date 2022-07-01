@@ -231,9 +231,9 @@ namespace ARMHook
 	void ARMHook::CPatch::TrampolinesRedirectJump(eInstructionSet sourceInstructionSet, uintptr_t addr, void* func, void** orig_func)
 	{
 		if (sourceInstructionSet == SET_THUMB)
-			TrampolinesRedirectCall(sourceInstructionSet, addr, func, orig_func, BW_THUMB32);
+			return TrampolinesRedirectCall(sourceInstructionSet, addr, func, orig_func, BW_THUMB32);
 		else if (sourceInstructionSet == SET_ARM)
-			TrampolinesRedirectCall(sourceInstructionSet, addr, func, orig_func, B_ARM);
+			return TrampolinesRedirectCall(sourceInstructionSet, addr, func, orig_func, B_ARM);
 		else
 			return;
 	}

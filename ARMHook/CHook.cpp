@@ -2,7 +2,12 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <ctype.h>
+
+#ifdef __arm__
 #include "Substrate/CydiaSubstrate.h"
+#elif  __aarch64__
+#include "And64InlineHook/And64InlineHook.hpp"
+#endif
 
 namespace ARMHook
 {
@@ -83,7 +88,9 @@ namespace ARMHook
     {
         unprotect((uintptr_t)addr, size);
         memcpy(addr, data, size);
+#ifdef __arm__
         cacheflush((uintptr_t)addr, (uintptr_t)addr + size, 0);
+#endif // __arm__
     }
 
     void* CHook::ReadMemory(void* addr, void* data, size_t size)
@@ -106,7 +113,11 @@ namespace ARMHook
     {
         if (addr == NULL || func == NULL) return;
         unprotect((uintptr_t)addr);
+#ifdef __arm__
         return MSHookFunction(addr, func, original);
+#elif __aarch64__
+        return A64HookFunction(addr, func, original);
+#endif
     }
 
     void CHook::MakeThumbNOP(uintptr_t addr, size_t size)
@@ -133,24 +144,28 @@ namespace ARMHook
 
     void CHook::MakeThumbRET(uintptr_t addr, int type)
     {
-        uint16_t ret[1];
+        uint16_t ret;
         if (type == 0)
-            *ret = 0x46F7;//MOV PC, LR
+            ret = 0x46F7;//MOV PC, LR
         else if (type == 1)
-            *ret = 0x4770;//BX LR
+            ret = 0x4770;//BX LR
+        else
+            return;
 
-        WriteMemory((void*)addr, ret, 2);
+        WriteMemory((void*)addr, &ret, 2);
     }
 
     void CHook::MakeArmRET(uintptr_t addr, int type)
     {
-        uint32_t ret[1];
+        uint32_t ret;
         if (type == 0)
-            *ret = 0xE1A0F00E;//MOV PC, LR
+            ret = 0xE1A0F00E;//MOV PC, LR
         else if (type == 1)
-            *ret = 0xE12FFF1E;//BX LR
+            ret = 0xE12FFF1E;//BX LR
+        else
+            return;
 
-        WriteMemory((void*)addr, ret, 4);
+        WriteMemory((void*)addr, &ret, 4);
     }
     
     void CHook::MakeThumbBL(uintptr_t addr, uintptr_t func)
@@ -339,7 +354,6 @@ namespace ARMHook
         uint16_t hex = (offset & 0xFFF) << 2 & 0xFF | reg | n;
 
         WriteMemory((void*)addr, &hex, 2);
-
     }
 
     void CHook::MakeArmBL(uintptr_t addr, uintptr_t func)
@@ -395,16 +409,15 @@ namespace ARMHook
         uint32_t hex = ((targe - addr - 8) / 4) & 0xFFFFFF | n; //offset = func - PC   PC = addr + 8  (/ 4 = align)
         WriteMemory((void*)addr, &hex, 4);
     }
-    
+
     uintptr_t CHook::GetThumbCallAddr(uintptr_t addr)
     {
         InstructionType type = GetThumbInstructionType(addr, true);
         uint16_t high, low;
         ReadMemory((void*)addr, &high, 2);
         ReadMemory((void*)(addr + 2), &low, 2);
-
         int32_t offset = ((high & 0x7FF) << 12) | ((low & 0x7FF) << 1);
-        if (offset & 0x400000) //go forward jump
+        if (!(offset & 0x800000)) //go forward jump  
         {
             offset = ~(offset - 1);
             offset &= 0x7FFFFF;
@@ -417,6 +430,7 @@ namespace ARMHook
             }
             else if (type == BW_THUMB32 || type == BL_THUMB32)
                 return addr + 4 - offset;
+                
             else
                 return 0;
         }
@@ -753,5 +767,5 @@ namespace ARMHook
         WriteMemory((void*)hook_addr_start, code2, 8);
         hook_addr_start += 16;
     }*/
-
+    
 }

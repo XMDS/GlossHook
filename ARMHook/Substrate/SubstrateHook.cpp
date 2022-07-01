@@ -934,9 +934,11 @@ static void SubstrateHookFunction(SubstrateProcessRef process, void *symbol, voi
 }
 #endif
 
+#ifdef __arm__
 _extern void MSHookFunction(void *symbol, void *replace, void **result) {
     SubstrateHookFunction(NULL, symbol, replace, result);
 }
+#endif
 
 #if defined(__APPLE__) && defined(__arm__)
 _extern void _Z14MSHookFunctionPvS_PS_(void *symbol, void *replace, void **result) {
