@@ -1,5 +1,14 @@
 #pragma once
 
+#ifdef __arm__
+#define GetArmPC(addr) (addr + 8)
+#elif __aarch64__
+#define GetArmPC(addr) (addr + 4)
+#endif
+
+#define GetThumbPC(addr) (addr + 4)
+
+
 enum eInstructionSet
 {
 	SET_UNDEFINED,
@@ -7,7 +16,16 @@ enum eInstructionSet
 	SET_THUMB,
 };
 
-enum thumb_reg { R0, R1, R2, R3, R4, R5, R6, R7 };
+namespace REG {
+#ifdef __arm__
+	//enum thumb_reg { R0, R1, R2, R3, R4, R5, R6, R7, SP = 13, LR, PC };
+	enum arm_reg { R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, SP, LR, PC };
+#elif __aarch64__
+	enum arm64_32 { W0, W1, W2, W3, W4, W5, W6, W7, W8, W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21, W22, W23, W24, W25, W26, W27, W28, W29, W30 };
+	enum arm64_64 { X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28, FP, LR, SP };
+#endif
+}
+
 
 enum cond_type //IT_THUMB16 || B_COND_THUMB16 || BW_COND_THUMB32 || B_ARM
 {

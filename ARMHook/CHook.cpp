@@ -4,24 +4,27 @@
 #include <ctype.h>
 
 #ifdef __arm__
-#include "Substrate/CydiaSubstrate.h"
+#include "Include/CydiaSubstrate.h"
 #elif  __aarch64__
-#include "And64InlineHook/And64InlineHook.hpp"
+#include "Include/And64InlineHook.hpp"
 #endif
 
 namespace ARMHook
 {
-    uintptr_t CHook::GetLibraryAddress(const char* library)
+    uintptr_t CHook::GetLibAddress(const char* libName, pid_t pid)
     {
         uintptr_t address = 0;
-        char buffer[2048] = { 0 };
-
-        FILE* fp = fopen("/proc/self/maps", "rt");
+        char buffer[2048] = { 0 }, fname[2048] = { 0 };
+        if (pid == -1)
+            strcpy(fname, "/proc/self/maps");
+        else
+            snprintf(fname, sizeof(fname), "/proc/%d/maps", pid);
+        FILE* fp = fopen(fname, "rt");
         if (fp != NULL)
         {
             while (fgets(buffer, sizeof(buffer) - 1, fp))
             {
-                if (strstr(buffer, library))
+                if (strstr(buffer, libName))
                 {
                     address = (uintptr_t)strtoul(buffer, NULL, 16);
                     break;
@@ -32,21 +35,26 @@ namespace ARMHook
         return address;
     }
 
-    uintptr_t CHook::GetLibraryLength(const char* library)
+    uintptr_t CHook::GetLibLength(const char* libName, pid_t pid)
     {
         uintptr_t address = 0, end_address = 0;
-        char buffer[2048] = { 0 };
-        
-        FILE* fp = fopen("/proc/self/maps", "rt");
+        char buffer[2048] = { 0 }, fname[2048] = { 0 };
+        if (pid == -1)
+            strcpy(fname, "/proc/self/maps");
+        else
+            snprintf(fname, sizeof(fname), "/proc/%d/maps", pid);
+        FILE* fp = fopen(fname, "rt");
         if (fp != NULL)
         {
             while (fgets(buffer, sizeof(buffer) - 1, fp))
             {
-                if (strstr(buffer, library))
+                if (strstr(buffer, libName))
                 {
                     const char* secondPart = strchr(buffer, '-');
-                    if (!address) end_address = address = (uintptr_t)strtoul(buffer, NULL, 16);
-                    if (secondPart != NULL) end_address = (uintptr_t)strtoul(secondPart + 1, NULL, 16);
+                    if (!address)
+                        end_address = address = (uintptr_t)strtoul(buffer, NULL, 16);
+                    if (secondPart != NULL)
+                        end_address = (uintptr_t)strtoul(secondPart + 1, NULL, 16);
                 }
             }
             fclose(fp);
@@ -54,34 +62,55 @@ namespace ARMHook
         return end_address - address;
     }
 
-    void* CHook::GetLibHandle(const char* library)
+    void* CHook::GetLibHandle(const char* libName)
     {
-        return dlopen(library, RTLD_NOLOAD);
+        auto lib = xdl_open(libName, XDL_DEFAULT);
+        return  lib ? lib : dlopen(libName, RTLD_LAZY);
     }
 
-    const char* CHook::GetLibraryFilePath(uintptr_t LibAddr)
+    const char* CHook::GetLibFilePath(uintptr_t libAddr)
     {
         Dl_info info;
-        if (dladdr((void*)LibAddr, &info) == 0)
+        if (dladdr((void*)libAddr, &info) == 0)
             return NULL;
         return info.dli_fname;
+    }
+
+    size_t CHook::GetLibFileSize(uintptr_t libAddr)
+    {
+        size_t size = 0;
+        FILE* file = fopen(GetLibFilePath(libAddr), "r");
+        if (file != NULL) {
+            fseek(file, 0, SEEK_END);
+            size = ftell(file);
+            fclose(file);
+        }
+        return size;
     }
     
     uintptr_t CHook::GetSymbolAddress(void* handle, const char* name)
     {
-        return (uintptr_t)dlsym(handle, name);
+        return (uintptr_t)xdl_sym(handle, name, NULL); //use xDL
     }
 
     uintptr_t CHook::GetSymbolAddress(uintptr_t LibAddr, const char* name)
     {
-        if (void* lib = GetLibHandle(GetLibraryFilePath(LibAddr)))
-            return GetSymbolAddress(lib, name);
-        return 0;
+        auto handle = GetLibHandle(GetLibFilePath(LibAddr));
+        return handle ? GetSymbolAddress(handle, name) : 0;
     }
     
-    int CHook::unprotect(uintptr_t addr, size_t len)
+    bool CHook::unprotect(uintptr_t addr, size_t len)
     {
-        return mprotect((void*)(addr & 0xFFFFF000), len, PROT_READ | PROT_WRITE | PROT_EXEC);
+        if (addr == NULL)
+            return false;
+
+       unsigned long PageSize = sysconf(_SC_PAGESIZE);
+       uintptr_t start = addr & ~(PageSize - 1);
+       uintptr_t end = ((addr + len) + PageSize - 1) & ~(PageSize - 1);
+       if (mprotect((void*)start, end - start, PROT_READ | PROT_WRITE | PROT_EXEC))
+           return false;
+
+       return true;
     }
 
     void CHook::WriteMemory(void* addr, void* data, size_t size)
@@ -90,7 +119,9 @@ namespace ARMHook
         memcpy(addr, data, size);
 #ifdef __arm__
         cacheflush((uintptr_t)addr, (uintptr_t)addr + size, 0);
-#endif // __arm__
+#elif __aarch64__
+        __builtin___clear_cache(reinterpret_cast<char*>(addr), reinterpret_cast<char*>(addr) + size);
+#endif
     }
 
     void* CHook::ReadMemory(void* addr, void* data, size_t size)
@@ -103,13 +134,13 @@ namespace ARMHook
     void CHook::PLTInternal(void* addr, void* func, void** original)
     {
         if (addr == NULL || func == NULL) return;
-        unprotect((uintptr_t)addr, 4);
+        unprotect((uintptr_t)addr, sizeof(uintptr_t));
         if (original != NULL)
             *((uintptr_t*)original) = *(uintptr_t*)addr;
         *(uintptr_t*)addr = (uintptr_t)func;
     }
 
-    void CHook::Internal(void* addr, void* func, void** original)
+    void CHook::Inline(void* addr, void* func, void** original)
     {
         if (addr == NULL || func == NULL) return;
         unprotect((uintptr_t)addr);
@@ -120,6 +151,7 @@ namespace ARMHook
 #endif
     }
 
+#ifdef __arm__
     void CHook::MakeThumbNOP(uintptr_t addr, size_t size)
     {
         unprotect(addr, size);
@@ -129,286 +161,180 @@ namespace ARMHook
             *((uint8_t*)addr + i + 1) = 0xBF;
         }
     }
-
+#endif
+    
     void CHook::MakeArmNOP(uintptr_t addr, size_t size)
     {
         unprotect(addr, size);
         for (int i = 0; i < size; i += 4)
         {
+#ifdef __arm__
             *((uint8_t*)addr + i + 0) = 0x00;
             *((uint8_t*)addr + i + 1) = 0xF0;
             *((uint8_t*)addr + i + 2) = 0x20;
             *((uint8_t*)addr + i + 3) = 0xE3;
+#elif __aarch64__
+            *((uint8_t*)addr + i + 0) = 0x1F;
+            *((uint8_t*)addr + i + 1) = 0x20;
+            *((uint8_t*)addr + i + 2) = 0x03;
+            *((uint8_t*)addr + i + 3) = 0xD5;
+#endif
         }
     }
 
-    void CHook::MakeThumbRET(uintptr_t addr, int type)
+#ifdef __arm__
+    void CHook::MakeThumbRET(uintptr_t addr, bool type)
     {
-        uint16_t ret;
-        if (type == 0)
-            ret = 0x46F7;//MOV PC, LR
-        else if (type == 1)
-            ret = 0x4770;//BX LR
+        if (type)
+            WriteMemory<uint16_t>(addr, 0x4770);//BX LR
         else
-            return;
-
-        WriteMemory((void*)addr, &ret, 2);
+            WriteMemory<uint16_t>(addr, 0x46F7);//MOV PC, LR
     }
+#endif
 
-    void CHook::MakeArmRET(uintptr_t addr, int type)
+    void CHook::MakeArmRET(uintptr_t addr, bool type)
     {
-        uint32_t ret;
-        if (type == 0)
-            ret = 0xE1A0F00E;//MOV PC, LR
-        else if (type == 1)
-            ret = 0xE12FFF1E;//BX LR
+#ifdef __arm__
+        if (type)
+            WriteMemory<uint32_t>(addr, 0xE12FFF1E);//BX LR
         else
-            return;
-
-        WriteMemory((void*)addr, &ret, 4);
+            WriteMemory<uint32_t>(addr, 0xE1A0F00E);//MOV PC, LR
+#elif __aarch64__
+        if (type)
+            WriteMemory<uint32_t>(addr, 0xD61F03C0);//BR X30(LR)
+        else
+            WriteMemory<uint32_t>(addr, 0xD65F03C0);//RET
+#endif
     }
     
+#ifdef __arm__
     void CHook::MakeThumbBL(uintptr_t addr, uintptr_t func)
     {
-        uint32_t offset = (func - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
-        uint16_t high = offset >> 12;
-        uint16_t low = (offset & 0xFFF) >> 1; //& 0xFFF go forward jump, clear sign bit
-        uint32_t hex = ((0xF800 | low) << 16) | (0xF000 | high);
-        
-        WriteMemory((void*)addr, &hex, 4);
+        uint32_t offset = (func - GetThumbPC(addr)) & 0x7FFFFF; //offset = func - PC
+        uint16_t high = offset >> 12 | 0xF000;
+        uint16_t low = (offset & 0xFFF) >> 1 | 0xF800; //& 0xFFF go forward jump, clear sign bit
+        uint32_t hex = low << 16 | high;
+
+        WriteMemory((void*)addr, &hex, sizeof(uintptr_t));
     }
 
     void CHook::MakeThumbBLX(uintptr_t addr, uintptr_t func)
     {
-        uint32_t offset = (func - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
-        uint16_t high = offset >> 12;
+        uint32_t offset = (func - GetThumbPC(addr)) & 0x7FFFFF; //offset = func - PC
+        uint16_t high = offset >> 12 | 0xF000;
         uint16_t low = (offset & 0xFFF) >> 1; //& 0xFFF go forward jump, clear sign bit
-        if (low % 2 != 0) { //align
+        if (low % 2 != 0)//align
             low++;
-        }
-        uint32_t hex = ((0xE800 | low) << 16) | (0xF000 | high);
+        uint32_t hex = (0xE800 | low) << 16 | high;
 
-        WriteMemory((void*)addr, &hex, 4);
+        WriteMemory((void*)addr, &hex, sizeof(uintptr_t));
     }
 
-    void CHook::MakeThumbB_W(uintptr_t addr, uintptr_t func) //B.W
+    void CHook::MakeThumbB_W(uintptr_t addr, uintptr_t targe) //B.W
     {
-        uint32_t offset = (func - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
-        uint16_t high = offset >> 12;
-        uint16_t low = (offset & 0xFFF) >> 1; //& 0xFFF go forward jump, clear sign bit
-        uint32_t hex = ((0xB800 | low) << 16) | (0xF000 | high);
+        uint32_t offset = (targe - GetThumbPC(addr)) & 0x7FFFFF; //offset = targe - PC
+        uint16_t high = offset >> 12 | 0xF000;
+        uint16_t low = (offset & 0xFFF) >> 1 | 0xB800; //& 0xFFF go forward jump, clear sign bit
+        uint32_t hex = low << 16 | high;
 
-        WriteMemory((void*)addr, &hex, 4);
+        WriteMemory((void*)addr, &hex, sizeof(uintptr_t));
     }
 
     void CHook::MakeThumbB_W(uintptr_t addr, uintptr_t targe, cond_type cond) //B.W
     {
-        uint16_t a, b;
+        uint16_t code1, code2;
         if (targe < addr)
         {
-            a = 0xA800;
-            switch (cond)
-            {
-            case EQ: b = 0xF43F;
-                break;
-            case NE: b = 0xF47F;
-                break;
-            case CS: b = 0xF4BF;//HS
-                break;
-            case CC: b = 0xF4FF;//LO
-                break;
-            case MI: b = 0xF53F;
-                break;
-            case PL: b = 0xF57F;
-                break;
-            case VS: b = 0xF5BF;
-                break;
-            case VC: b = 0xF5FF;
-                break;
-            case HI: b = 0xF63F;
-                break;
-            case LS: b = 0xF67F;
-                break;
-            case GE: b = 0xF6BF;
-                break;
-            case LT: b = 0xF6FF;
-                break;
-            case GT: b = 0xF73F;
-                break;
-            case LE: b = 0xF77F;
-                break;
-            case AL: b = 0xF7BF;
-                break;
-            case BNV: b = 0xF7FF;
-                break;
-            }
+            code1 = 0xA800;
+            code2 = 0xF43F | (cond << 6);
         }
         else
         {
-            a = 0x8000;
-            switch (cond)
-            {
-            case EQ: b = 0xF000;
-                break;
-            case NE: b = 0xF040;
-                break;
-            case CS: b = 0xF080;//HS
-                break;
-            case CC: b = 0xF0C0;//LO
-                break;
-            case MI: b = 0xF100;
-                break;
-            case PL: b = 0xF140;
-                break;
-            case VS: b = 0xF180;
-                break;
-            case VC: b = 0xF1C0;
-                break;
-            case HI: b = 0xF200;
-                break;
-            case LS: b = 0xF240;
-                break;
-            case GE: b = 0xF280;
-                break;
-            case LT: b = 0xF2C0;
-                break;
-            case GT: b = 0xF300;
-                break;
-            case LE: b = 0xF340;
-                break;
-            case AL: b = 0xF380;
-                break;
-            case BNV: b = 0xF3C0;
-                break;
-            }
+            code1 = 0x8000;
+            code2 = 0xF000 | (cond << 6);
         }
-        uint32_t offset = (targe - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
-        uint16_t high = (offset & 0xFFF) >> 12;
-        uint16_t low = (offset & 0xFFF) >> 1; //& 0xFFF go forward jump, clear sign bit
-        uint32_t hex = ((a | low) << 16) | (b | high);
+        uint32_t offset = (targe - GetThumbPC(addr)) & 0x7FFFFF; //offset = targe - PC
+        uint16_t high = (offset & 0xFFF) >> 12 | code2;
+        uint16_t low = (offset & 0xFFF) >> 1 | code1; //& 0xFFF go forward jump, clear sign bit
+        uint32_t hex = low << 16 | high;
 
-        WriteMemory((void*)addr, &hex, 4);
+        WriteMemory((void*)addr, &hex, sizeof(uintptr_t));
     }
 
     void CHook::MakeThumbB(uintptr_t addr, uintptr_t targe) //B
     {
-        uint16_t offset = (targe - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
+        uint16_t offset = (targe - GetThumbPC(addr)) & 0x7FFFFF; //offset = targe - PC
         uint16_t hex = (offset & 0xFFF) >> 1 | 0xE000; //& 0xFFF go forward jump, clear sign bit
 
-        WriteMemory((void*)addr, &hex, 2);
+        WriteMemory((void*)addr, &hex, sizeof(uint16_t));
     }
 
     void CHook::MakeThumbB(uintptr_t addr, uintptr_t targe, cond_type cond) //B
     {
-        uint16_t offset = (targe - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
-        int16_t n;
-        switch (cond)
-        {
-        case EQ: n = 0xD000;
-            break;
-        case NE: n = 0xD100;
-            break;
-        case CS: n = 0xD200;//BHS
-            break;
-        case CC: n = 0xD300;//BLO
-            break;
-        case MI: n = 0xD400;
-            break;
-        case PL: n = 0xD500;
-            break;
-        case VS: n = 0xD600;
-            break;
-        case VC: n = 0xD700;
-            break;
-        case HI: n = 0xD800;
-            break;
-        case LS: n = 0xD900;
-            break;
-        case GE: n = 0xDA00;
-            break;
-        case LT: n = 0xDB00;
-            break;
-        case GT: n = 0xDC00;
-            break;
-        case LE: n = 0xDD00;
-            break;
-        case AL: n = 0xDE00;
-            break;
-        case BNV: n = 0xDF00;
-            break;
-        }
-        uint16_t hex = (offset & 0xFFF) >> 1 & 0xFF | n; //& 0xFFF go forward jump, clear sign bit
+        uint16_t offset = (targe - GetThumbPC(addr)) & 0x7FFFFF; //offset = targe - PC   
+        uint16_t code = 0xD000 | (cond << 8);
+        uint16_t hex = (offset & 0xFFF) >> 1 & 0xFF | code; //& 0xFFF go forward jump, clear sign bit
 
-        WriteMemory((void*)addr, &hex, 2);
+        WriteMemory((void*)addr, &hex, sizeof(uint16_t));
     }
 
-    void CHook::MakeThumbCBZ_CBNZ(uintptr_t addr, uintptr_t targe, uint8_t reg, bool nonzero) //CBZ CBNZ
+    void CHook::MakeThumbCBZ_CBNZ(uintptr_t addr, uintptr_t targe, uint8_t reg, bool is_cbnz) //CBZ CBNZ
     {
-        int16_t n;
-        if ((targe - addr < 0x4 && targe - addr >= -0x3C) || (targe - addr >= 0x44 && targe - addr < 0x84))
-            n = nonzero ? 0xBB00 : 0xB300;
-        else 
-            n = nonzero ? 0xB900 : 0xB100;
-        
-        uint16_t offset = (targe - addr - 4) & 0x7FFFFF; //offset = func - PC   PC = addr + 4
-        uint16_t hex = (offset & 0xFFF) << 2 & 0xFF | reg | n;
+        uint16_t code;
+        if (targe - addr > 0x40)
+            code = is_cbnz ? 0xBB00 : 0xB300;
+        else
+            code = is_cbnz ? 0xB900 : 0xB100;
 
-        WriteMemory((void*)addr, &hex, 2);
+        uint16_t offset = (targe - GetThumbPC(addr)) & 0x7FFFFF; //offset = func - PC
+        uint16_t hex = (offset & 0xFFF) << 2 & 0xFF | reg | code;
+
+        WriteMemory((void*)addr, &hex, sizeof(uint16_t));
     }
-
+#endif
+    
     void CHook::MakeArmBL(uintptr_t addr, uintptr_t func)
     {
-        uint32_t hex = ((func - addr - 8) / 4) & 0xFFFFFF | 0xEB000000; //offset = func - PC   PC = addr + 8  (/ 4 = align)
-        WriteMemory((void*)addr, &hex, 4);
+#ifdef __arm__
+        uint32_t hex = ((func - GetArmPC(addr)) / 4) & 0xFFFFFF | 0xEB000000; //offset = func - PC  (/ 4 = align)
+#elif __aarch64__
+        uint32_t code = ((func - addr) & 0x800000) ? 0x97000000 : 0x94000000;
+        uint32_t hex = ((func - addr) / 4) & 0xFFFFFF | code; // (/ 4 = align)
+#endif
+        WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
 
     void CHook::MakeArmB(uintptr_t addr, uintptr_t targe) //B
     {
-        uint32_t hex = ((targe - addr - 8) / 4) & 0xFFFFFF | 0xEA000000; //offset = func - PC   PC = addr + 8  (/ 4 = align)
-        WriteMemory((void*)addr, &hex, 4);
+#ifdef __arm__
+        uint32_t hex = ((targe - GetArmPC(addr)) / 4) & 0xFFFFFF | 0xEA000000; //offset = func - PC   (/ 4 = align)
+#elif __aarch64__
+        uint32_t code = ((targe - addr) & 0x800000) ? 0x17000000 : 0x14000000;
+        uint32_t hex = ((targe - addr) / 4) & 0xFFFFFF | code; // (/ 4 = align)
+#endif
+        WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
 
     void CHook::MakeArmB(uintptr_t addr, uintptr_t targe, cond_type cond)
     {
-        int32_t n;
-        switch (cond)
-        {
-        case EQ: n = 0x0A000000;
-            break;
-        case NE: n = 0x1A000000;
-            break;
-        case CS: n = 0x2A000000;//BHS
-            break;
-        case CC: n = 0x3A000000;//BLO
-            break;
-        case MI: n = 0x4A000000;
-            break;
-        case PL: n = 0x5A000000;
-            break;
-        case VS: n = 0x6A000000;
-            break;
-        case VC: n = 0x7A000000;
-            break;
-        case HI: n = 0x8A000000;
-            break;
-        case LS: n = 0x9A000000;
-            break;
-        case GE: n = 0xAA000000;
-            break;
-        case LT: n = 0xBA000000;
-            break;
-        case GT: n = 0xCA000000;
-            break;
-        case LE: n = 0xDA000000;
-            break;
-        case AL: n = 0xEA000000;//see MakeArmB(uintptr_t addr, uintptr_t targe)
-            break;
-        case BNV: n = 0xFA000000;
-            break;
-        }
-        uint32_t hex = ((targe - addr - 8) / 4) & 0xFFFFFF | n; //offset = func - PC   PC = addr + 8  (/ 4 = align)
-        WriteMemory((void*)addr, &hex, 4);
+#ifdef __arm__
+        int32_t code = 0x0A000000 | (cond << 28);
+        uint32_t hex = ((targe - GetArmPC(addr)) / 4) & 0xFFFFFF | code; //offset = func - PC   (/ 4 = align)
+#elif __aarch64__
+        uint32_t hex = ((targe - addr) / 4) << 5 & 0xFFFFE0 | 0x54000000 | cond; // (/ 4 = align)
+#endif
+        WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
+
+#ifdef __aarch64__
+    void CHook::MakeArmCBZ_CBNZ(uintptr_t addr, uintptr_t targe, uint8_t reg, bool is_cbnz, bool is64)
+    {
+        uint32_t code = is_cbnz ? (is64 ? 0xB5000000 : 0x35000000) : (is64 ? 0xB4000000 : 0x34000000);
+        uint32_t hex = ((targe - addr) / 4) << 5 & 0xFFFFE0 | code | reg;
+
+        WriteMemory((void*)addr, &hex, sizeof(uint32_t));
+    }
+#endif
 
     uintptr_t CHook::GetThumbCallAddr(uintptr_t addr)
     {
@@ -592,8 +518,8 @@ namespace ARMHook
         auto patternstart = ret.vBytes.data();
         auto length = ret.vBytes.size();
 
-        uintptr_t pMemoryBase = GetLibraryAddress(library);
-        size_t nMemorySize = GetLibraryLength(library) - length;
+        uintptr_t pMemoryBase = GetLibAddress(library);
+        size_t nMemorySize = GetLibLength(library) - length;
 
         for (size_t i = 0; i < nMemorySize; i++)
         {
