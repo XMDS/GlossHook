@@ -3,11 +3,10 @@
 #ifdef __arm__
 #define GetArmPC(addr) (addr + 8)
 #elif __aarch64__
-#define GetArmPC(addr) (addr + 4)
+#define GetArmPC(addr) (addr)
 #endif
 
 #define GetThumbPC(addr) (addr + 4)
-
 
 enum eInstructionSet
 {
@@ -179,4 +178,24 @@ enum InstructionType
 	*/
 	LDR_ARM,
 
+	/*******************ARM64******************/
+
+	/* B <label> (not cond)
+	* preview: <B loc_000006> <B loc_666666> <B loc_233333>....
+	*/
+	B_ARM64,
+
+	/* Bxx <label> (see enum cond_type)
+	* preview: { <BNE loc_000006> <BEQ loc_666666> <BLT loc_233333>.... }
+	*/
+	B_COND_ARM64,
+
+	/* BL <label>
+	* preview: <BL loc_000006> <BL loc_666666> <BL loc_233333> <BL func>....
+	*/
+	BL_ARM64,
+
+	LDR_ARM64,
+
+	LDR_ARM64_32
 };

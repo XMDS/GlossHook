@@ -62,8 +62,9 @@ namespace ARMHook
 		static void MakeThumbCBZ_CBNZ(uintptr_t addr, uintptr_t targe, uint8_t reg, bool is_cbnz);
 		static void MakeThumbB_W(uintptr_t addr, uintptr_t targe);
 		static void MakeThumbB_W(uintptr_t addr, uintptr_t targe, cond_type cond);
+
+		static void MakeArmBLX(uintptr_t addr, uintptr_t func);
 #endif
-		
 		static void MakeArmBL(uintptr_t addr, uintptr_t func);
 		static void MakeArmB(uintptr_t addr, uintptr_t targe);
 		static void MakeArmB(uintptr_t addr, uintptr_t targe, cond_type cond);

@@ -185,26 +185,19 @@ namespace ARMHook
 #ifdef __arm__
     void CHook::MakeThumbRET(uintptr_t addr, bool type)
     {
-        if (type)
-            WriteMemory<uint16_t>(addr, 0x4770);//BX LR
-        else
-            WriteMemory<uint16_t>(addr, 0x46F7);//MOV PC, LR
+        uint16_t ret = type ? 0x4770 /* BX LR */ : 0x46F7; //MOV PC, LR
+        WriteMemory<uint16_t>(addr, ret);
     }
 #endif
 
     void CHook::MakeArmRET(uintptr_t addr, bool type)
     {
 #ifdef __arm__
-        if (type)
-            WriteMemory<uint32_t>(addr, 0xE12FFF1E);//BX LR
-        else
-            WriteMemory<uint32_t>(addr, 0xE1A0F00E);//MOV PC, LR
+        uint32_t ret = type ? 0xE12FFF1E /* BX LR */ : 0xE1A0F00E; //MOV PC, LR
 #elif __aarch64__
-        if (type)
-            WriteMemory<uint32_t>(addr, 0xD61F03C0);//BR X30(LR)
-        else
-            WriteMemory<uint32_t>(addr, 0xD65F03C0);//RET
+        uint32_t ret = type ? 0xD61F03C0 /* BR X30(LR) */ : 0xD65F03C0; //RET
 #endif
+        WriteMemory<uint32_t>(addr, ret);
     }
     
 #ifdef __arm__
@@ -291,37 +284,51 @@ namespace ARMHook
 
         WriteMemory((void*)addr, &hex, sizeof(uint16_t));
     }
+
+    void CHook::MakeArmBLX(uintptr_t addr, uintptr_t func)
+    {
+        uintptr_t PC = GetArmPC(addr);
+        uintptr_t code = (func - PC) % 4 == 0 ? 0xFA000000 : 0xFB000000; //align
+        uint32_t hex = ((func - PC) / 4) & 0xFFFFFF | code; //offset = func - PC  (/ 4 = align)
+
+        WriteMemory((void*)addr, &hex, sizeof(uint32_t));
+    }
 #endif
     
     void CHook::MakeArmBL(uintptr_t addr, uintptr_t func)
     {
+        uintptr_t PC = GetArmPC(addr);
 #ifdef __arm__
-        uint32_t hex = ((func - GetArmPC(addr)) / 4) & 0xFFFFFF | 0xEB000000; //offset = func - PC  (/ 4 = align)
+        uint32_t hex = ((func - PC) / 4) & 0xFFFFFF | 0xEB000000; //offset = func - PC  (/ 4 = align)
 #elif __aarch64__
-        uint32_t code = ((func - addr) & 0x800000) ? 0x97000000 : 0x94000000;
-        uint32_t hex = ((func - addr) / 4) & 0xFFFFFF | code; // (/ 4 = align)
+        uint32_t code = ((func - PC) & 0x800000) ? 0x97000000 : 0x94000000;
+        uint32_t hex = ((func - PC) / 4) & 0xFFFFFF | code; // (/ 4 = align)
+        //uint32_t hex = ((func - PC) & 0xFFFFFFF) >> 2 | 0x94000000;
 #endif
         WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
 
     void CHook::MakeArmB(uintptr_t addr, uintptr_t targe) //B
     {
+        uintptr_t PC = GetArmPC(addr);
 #ifdef __arm__
-        uint32_t hex = ((targe - GetArmPC(addr)) / 4) & 0xFFFFFF | 0xEA000000; //offset = func - PC   (/ 4 = align)
+        uint32_t hex = ((targe - PC) / 4) & 0xFFFFFF | 0xEA000000; //offset = func - PC   (/ 4 = align)
 #elif __aarch64__
-        uint32_t code = ((targe - addr) & 0x800000) ? 0x17000000 : 0x14000000;
-        uint32_t hex = ((targe - addr) / 4) & 0xFFFFFF | code; // (/ 4 = align)
+        uint32_t code = ((targe - PC) & 0x800000) ? 0x17000000 : 0x14000000;
+        uint32_t hex = ((targe - PC) / 4) & 0xFFFFFF | code; // (/ 4 = align)
+        //uint32_t hex = ((targe - PC) & 0xFFFFFFF) >> 2 | 0x14000000;
 #endif
         WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
 
     void CHook::MakeArmB(uintptr_t addr, uintptr_t targe, cond_type cond)
     {
+        uintptr_t PC = GetArmPC(addr);
 #ifdef __arm__
         int32_t code = 0x0A000000 | (cond << 28);
-        uint32_t hex = ((targe - GetArmPC(addr)) / 4) & 0xFFFFFF | code; //offset = func - PC   (/ 4 = align)
+        uint32_t hex = ((targe - PC) / 4) & 0xFFFFFF | code; //offset = func - PC   (/ 4 = align)
 #elif __aarch64__
-        uint32_t hex = ((targe - addr) / 4) << 5 & 0xFFFFE0 | 0x54000000 | cond; // (/ 4 = align)
+        uint32_t hex = ((targe - PC) / 4) << 5 & 0xFFFFE0 | 0x54000000 | cond; // (/ 4 = align)
 #endif
         WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
@@ -330,7 +337,7 @@ namespace ARMHook
     void CHook::MakeArmCBZ_CBNZ(uintptr_t addr, uintptr_t targe, uint8_t reg, bool is_cbnz, bool is64)
     {
         uint32_t code = is_cbnz ? (is64 ? 0xB5000000 : 0x35000000) : (is64 ? 0xB4000000 : 0x34000000);
-        uint32_t hex = ((targe - addr) / 4) << 5 & 0xFFFFE0 | code | reg;
+        uint32_t hex = ((targe - GetArmPC(addr)) / 4) << 5 & 0xFFFFE0 | code | reg;
 
         WriteMemory((void*)addr, &hex, sizeof(uint32_t));
     }
@@ -338,6 +345,7 @@ namespace ARMHook
 
     uintptr_t CHook::GetThumbCallAddr(uintptr_t addr)
     {
+        uintptr_t PC = GetThumbPC(addr);
         InstructionType type = GetThumbInstructionType(addr, true);
         uint16_t high, low;
         ReadMemory((void*)addr, &high, 2);
@@ -350,12 +358,12 @@ namespace ARMHook
             if (type == BLX_THUMB32)
             {
                 if (addr % 4 != 0)
-                    return addr + 2 - offset;
+                    return PC - 2 - offset;
                 else
-                    return addr + 4 - offset;
+                    return PC - offset;
             }
             else if (type == BW_THUMB32 || type == BL_THUMB32)
-                return addr + 4 - offset;
+                return PC - offset;
                 
             else
                 return 0;
@@ -364,96 +372,97 @@ namespace ARMHook
         if (type == BLX_THUMB32)
         {
             if (addr % 4 != 0)
-                return addr + 2 + offset;
+                return PC - 2 + offset;
             else
-                return addr + 4 + offset;
+                return PC + offset;
         }
         else if (type == BW_THUMB32 || type == BL_THUMB32)
-            return addr + 4 + offset;
+            return PC + offset;
         else
             return 0;
     }
 
     uintptr_t CHook::GetArmCallAddr(uintptr_t addr)
     {
+        uintptr_t PC = GetArmPC(addr);
         InstructionType type = GetArmInstructionType(addr);
-        uint32_t hex;
-        ReadMemory((void*)addr, &hex, 4);
-
-        int32_t a = (hex & 0xFFFFFF) << 2;
+        uint32_t hex = ReadMemory<uint32_t>(addr);
+        uint32_t code;
+#ifdef __arm__
         if (type == BLX_ARM)
-            a = a | ((hex & 0x1000000) >> 23);
+            code = ((hex & 0xFFFFFF) << 2) | ((hex & 0x1000000) >> 23);
         else if (type == B_ARM || type == BL_ARM)
-            goto xxx;
+            code = (hex & 0xFFFFFF) << 2;
         else
             return 0;
-    xxx:
-        int32_t offset = a >> 25;
-        offset = offset ? (a | (0xFFFFFFFF << 26)) : a;
-        return addr + 8 + offset;
+
+        int32_t bit = code >> 25;
+        uint32_t offset = bit ? (code | (0xFFFFFFFF << 26)) : code;
+        if (type == BLX_ARM)
+            return PC + offset + 1;
+        return PC + offset;
+#elif __aarch64__
+        if (type == B_ARM64 || type == BL_ARM64) {
+            uint32_t code = hex & 0x3FFFFFF;
+            if ((code >> 25) == 1)
+                return (uint64_t)PC - (0x3FFFFFFu - code + 1) * 4;
+            return (uint64_t)PC + code * 4;
+        }
+        else
+            return 0;
+#endif
     }
 
     InstructionType CHook::GetThumbInstructionType(uintptr_t addr, bool isThumb32)
     {
-        union 
-        {
-            uint16_t hex16; 
-            struct
-            {
-                uint16_t high;
-                uint16_t low;
-            } bit;
-            uint32_t hex32;
-        } code;
-
         if (isThumb32)
         {
-            ReadMemory((void*)addr, &code.bit.high, 2);
-            ReadMemory((void*)(addr + 2), &code.bit.low, 2);
-            code.hex32 = (code.bit.high << 16) | code.bit.low;
-            if (((code.hex32 & 0xF800D000) == 0xF0008000) && ((code.hex32 & 0x03800000u) != 0x03800000u))
+            uint16_t hight = ReadMemory<uint16_t>(addr);
+            uint16_t low = ReadMemory<uint16_t>(addr + 2);
+            uint32_t hex32 = (hight << 16) | low;
+            if (((hex32 & 0xF800D000) == 0xF0008000) && ((hex32 & 0x03800000u) != 0x03800000u))
                 return BW_COND_THUMB32;
-            else if ((code.hex32 & 0xF800D000) == 0xF0009000)
+            else if ((hex32 & 0xF800D000) == 0xF0009000)
                 return BW_THUMB32;
-            else if ((code.hex32 & 0xF800D000) == 0xF000D000)
+            else if ((hex32 & 0xF800D000) == 0xF000D000)
                 return BL_THUMB32;
-            else if ((code.hex32 & 0xF800D000) == 0xF000C000)
+            else if ((hex32 & 0xF800D000) == 0xF000C000)
                 return BLX_THUMB32;
-            else if ((code.hex32 & 0xFF7F0000) == 0xF85F0000)
+            else if ((hex32 & 0xFF7F0000) == 0xF85F0000)
                 return LDRW_THUMB32;
             else
                 return UNDEFINE;
         }
         else 
         {
-            ReadMemory((void*)addr, &code, 2);
-            if (((code.hex16 & 0xFF00u) == 0xBF00) && ((code.hex16 & 0x000Fu) != 0x0000) && ((code.hex16 & 0x00F0u) != 0x00F0))
+            uint16_t hex16 = ReadMemory<uint16_t>(addr);
+            if (((hex16 & 0xFF00u) == 0xBF00) && ((hex16 & 0x000Fu) != 0x0000) && ((hex16 & 0x00F0u) != 0x00F0))
                 return IT_THUMB16;
-            else if (((code.hex16 & 0xF000u) == 0xD000) && ((code.hex16 & 0x0F00u) != 0x0F00) && ((code.hex16 & 0x0F00u) != 0x0E00))
+            else if (((hex16 & 0xF000u) == 0xD000) && ((hex16 & 0x0F00u) != 0x0F00) && ((hex16 & 0x0F00u) != 0x0E00))
                 return B_COND_THUMB16;
-            else if ((code.hex16 & 0xF800u) == 0xE000)
+            else if ((hex16 & 0xF800u) == 0xE000)
                 return B_THUMB16;
-            else if /*((code.hex16 & 0xFFF8u) == 0x4778)*/ ((code.hex16 & 0xFF00u) == 0x4700)
+            else if /*((code.hex16 & 0xFFF8u) == 0x4778)*/ ((hex16 & 0xFF00u) == 0x4700)
                 return BX_THUMB16;
-            else if (((code.hex16 & 0xFF78u) == 0x4478) && ((code.hex16 & 0x0087u) != 0x0085))
+            else if (((hex16 & 0xFF78u) == 0x4478) && ((hex16 & 0x0087u) != 0x0085))
                 return ADD_PC_THUMB16;
-            else if /*((code.hex16 & 0xFF78u) == 0x4678)*/ ((code.hex16 & 0xFF00u) == 0x4600)
+            else if /*((code.hex16 & 0xFF78u) == 0x4678)*/ ((hex16 & 0xFF00u) == 0x4600)
                 return MOV_REG_THUMB16;
-            else if ((code.hex16 & 0xF800u) == 0xA000)
+            else if ((hex16 & 0xF800u) == 0xA000)
                 return ADR_THUMB16;
-            else if ((code.hex16 & 0xF800u) == 0x4800)
+            else if ((hex16 & 0xF800u) == 0x4800)
                 return LDR_THUMB16;
-            else if (((code.hex16 & 0xF800u) == 0x6800) || ((code.hex16 & 0xF800u) == 0x5800) || ((code.hex16 & 0xF800u) == 0x9800))
+            else if (((hex16 & 0xF800u) == 0x6800) || ((hex16 & 0xF800u) == 0x5800) || ((hex16 & 0xF800u) == 0x9800))
                 return LDR_REG_THUMB16;
-            else if ((code.hex16 & 0xFD00u) == 0xB100)
+            else if ((hex16 & 0xFD00u) == 0xB100)
                 return CBZ_THUMB16;
-            else if ((code.hex16 & 0xFD00u) == 0xB900)
+            else if ((hex16 & 0xFD00u) == 0xB900)
                 return CBNZ_THUMB16;
-            else if (((code.hex16 & 0xF800u) == 0x1800) || ((code.hex16 & 0xF800u) == 0x3000))
+            else if (((hex16 & 0xF800u) == 0x1800) || ((hex16 & 0xF800u) == 0x3000))
                 return ADDS_THUMB16;
-            else if ((code.hex16 & 0xF800u) == 0x2000)
+            else if ((hex16 & 0xF800u) == 0x2000)
                 return MOVS_THUMB16;
-            else if (((code.hex16 & 0xF800u) == 0xA800) || ((code.hex16 & 0xF800u) == 0xB000))
+            else if (((hex16 & 0xF800u) == 0xA800) || ((hex16 & 0xF800u) == 0xB000))
                 return ADD_REG_THUMB16;
             else
                 return UNDEFINE;
@@ -462,18 +471,30 @@ namespace ARMHook
 
     InstructionType CHook::GetArmInstructionType(uintptr_t addr)
     {
-        uint32_t code;
-        ReadMemory((void*)addr, &code, 4);
-        if (((code & 0x0F000000u) == 0x0A000000) && ((code & 0xF0000000) != 0xF0000000))
+        uint32_t hex32 = ReadMemory<uint32_t>(addr);
+#ifdef __arm__
+        if (((hex32 & 0x0F000000u) == 0x0A000000) && ((hex32 & 0xF0000000) != 0xF0000000))
             return B_ARM;
-        else if (((code & 0x0FFFFFFFu) == 0x012FFF1F) && ((code & 0xF0000000) != 0xF0000000) || ((code & 0x0FFFFFFFu) == 0x012FFF1E))
+        else if (((hex32 & 0x0FFFFFFFu) == 0x012FFF1F) && ((hex32 & 0xF0000000) != 0xF0000000) || ((hex32 & 0x0FFFFFFFu) == 0x012FFF1E))
             return BX_ARM;
-        else if (((code & 0x0F000000u) == 0x0B000000) && ((code & 0xF0000000) != 0xF0000000))
+        else if (((hex32 & 0x0F000000u) == 0x0B000000) && ((hex32 & 0xF0000000) != 0xF0000000))
             return BL_ARM;
-        else if ((code & 0xFE000000) == 0xFA000000)
+        else if ((hex32 & 0xFE000000) == 0xFA000000)
             return BLX_ARM;
-        else if (((code & 0xE5F0000) == 0x41F0000) && ((code & 0x0F7F0000u) == 0x051F0000) && ((code & 0xF0000000) != 0xF0000000))
+        else if (((hex32 & 0xE5F0000) == 0x41F0000) && ((hex32 & 0x0F7F0000u) == 0x051F0000) && ((hex32 & 0xF0000000) != 0xF0000000))
             return LDR_ARM;
+#elif __aarch64__
+        if ((hex32 & 0xFC000000) == 0x14000000)
+            return B_ARM64;
+        else if ((hex32 & 0xFF000010) == 0x54000000)
+            return B_COND_ARM64;
+        else if ((hex32 & 0xFC000000) == 0x94000000)
+            return BL_ARM64;
+        else if ((hex32 & 0xFF000000) == 0x58000000)
+            return LDR_ARM64;
+        else if ((hex32 & 0xFF000000) == 0x18000000)
+            return LDR_ARM64_32;
+#endif
         else
             return UNDEFINE;
     }
