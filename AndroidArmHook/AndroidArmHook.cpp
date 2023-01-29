@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <sys/mman.h> //mprotect
 
+#include "InlineHook.h"
+#include "Instruction.h"
 #include "HLog.h"
 #include "xDL/xdl.h"
 
@@ -295,3 +297,33 @@ void PLTInternal(void* addr, void* func, void** original)
     *(uintptr_t*)addr = (uintptr_t)func;
     cacheflush((uintptr_t)addr, (uintptr_t)addr + sizeof(uintptr_t), 0);
 }
+
+//inline hook
+void* InlineHookSymAddr(void* sym_addr, void* new_func, void** original)
+{
+    //1.检测addr是T还是A模式
+    if (TEST_BIT0((uintptr_t)sym_addr)) {
+        return InlineHookThumb((void*)CLEAR_BIT0((uintptr_t)sym_addr), new_func, original);
+    }
+    else {
+        return InlineHookARM(sym_addr, new_func, original);
+    }
+    //2.检测符号大小
+    //3.短函数hook
+}
+
+void* InlineHookFuncAddr(void* func_addr, void* new_func, void** original, i_set inst_set)
+{
+
+}
+
+void CancelHook(void* hook)
+{
+    SetInlineHookState((InlineHookInfo*)hook, DISABLE_HOOK);
+}
+
+void RecoverHook(void* hook)
+{
+    SetInlineHookState((InlineHookInfo*)hook, ENABLE_HOOK);
+}
+

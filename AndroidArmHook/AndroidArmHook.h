@@ -15,15 +15,8 @@ extern "C" {
 
 #include <unistd.h> //lseek PAGE_SIZE
 
-#define PAGE_START(addr, size) ((uintptr_t)addr & ~(size - 1))                             
-#define PAGE_END(addr, size) PAGE_START(addr + size - 1, size)
 #ifdef __arm__
-#define SET_BIT0(addr) (addr | 1)
-#define CLEAR_BIT0(addr) (addr & 0xFFFFFFFE)
-#define TEST_BIT0(addr) (addr & 1)
-#define GET_INST_SET(addr) (TEST_BIT0(addr) ? i_set::$THUMB32 : i_set::$ARM)
-#elif __aarch64__
-#define cacheflush(addr, byte, n) __builtin___clear_cache((char*)addr, (char*)byte)
+#define GET_INST_SET(addr) (addr & 1 ? i_set::$THUMB : i_set::$ARM)
 #endif
 	
 	typedef void* lib_h;
@@ -37,7 +30,7 @@ extern "C" {
 		int8_t align : 3;
 	} p_flag;
 
-	typedef enum { NONE, $THUMB32, $ARM, $ARM64 } i_set; //InstructionSet
+	typedef enum { NONE, $THUMB, $ARM, $ARM64 } i_set; //InstructionSet
 
 	/*
 	* Get the starting address where the library was first loaded into memory(image base).
@@ -210,6 +203,10 @@ extern "C" {
 	*/
 	void PLTInternal(void* addr, void* func, void** original);
 
+	void* InlineHookSymAddr(void* sym_addr, void* new_func, void** original);
+	void CancelHook(void* hook);
+	void RecoverHook(void* hook);
+
 #ifdef __cplusplus
 	}
 
@@ -250,14 +247,14 @@ extern "C" {
 	* InlineHook template, complete type conversion.
 	*/
 	template <class A, class B, class C>
-	inline static void InlineHook(A addr, B func, C original)
+	inline static void* InlineHook(A addr, B func, C original)
 	{
-		return InlineHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
+		return InlineHookSymAddr(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
 	}
 	template <class A, class B>
-	inline static void InlineHook(A addr, B func)
+	inline static void* InlineHook(A addr, B func)
 	{
-		return InlineHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
+		return InlineHookSymAddr(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
 	}
 #endif
 #endif
