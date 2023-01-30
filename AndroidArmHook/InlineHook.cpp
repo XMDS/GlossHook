@@ -118,6 +118,8 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 		info->prev->next = info;
 		info->backups_len = info->prev->backups_len;
 		ReadMemory(info->prev->backups_inst, info->backups_inst, info->backups_len, false);
+		ReadMemory(info->prev->fix_inst_buf, info->fix_inst_buf, MAX_INST_BUF_SIZE, false);
+
 		return 0;
 	}
 	else {
@@ -186,7 +188,7 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 	return 1;
 }
 
-void* InlineHookThumb(void* addr, void* func, void** original)
+InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 {
 	if (addr == NULL || func == NULL) {
 		WLOGE("Inline Hook failed, address is empty.");
@@ -222,7 +224,7 @@ void* InlineHookThumb(void* addr, void* func, void** original)
 	return info;
 }
 
-void* InlineHookARM(void* addr, void* func, void** original)
+InlineHookInfo* InlineHookARM(void* addr, void* func, void** original)
 {
 	if (addr == NULL || func == NULL) {
 		WLOGE("Inline Hook failed, address is empty.");
@@ -255,20 +257,66 @@ void* InlineHookARM(void* addr, void* func, void** original)
 	return info;
 }
 
-/*
-void DeleteInlineHook(void* stub)
+InlineHookInfo* GetInlineHook(void* addr, int count, i_set inst_set)
 {
-	InlineHookInfo* info = (InlineHookInfo*)stub;
-	if (info->hook_count == 1 && info->prev == nullptr) {
-		ReadMemory((void*)info, info->next, sizeof(InlineHookInfo), false);
+	InlineHookInfo* info = GetLastInlineHook(addr, inst_set);
+	if (info == nullptr) return nullptr;
 
+	while (info->hook_count != count) {
+		info = info->prev;
+		if (info == nullptr) break;
 	}
 
+	return info;
+}
+
+InlineHookInfo* GetLastInlineHook(void* addr, i_set inst_set)
+{
+	if (inst_set == $THUMB)
+		return ReadMemory<InlineHookInfo*>(CLEAR_BIT0((uintptr_t)addr) + ThumbTrampolineManageFuncSize - 4, false);
+	else
+		return ReadMemory<InlineHookInfo*>((uintptr_t)addr + ArmTrampolineManageFuncSize - 4, false);
+}
 
 
+static void SetNextInlineHookCount(InlineHookInfo* info) {
+	InlineHookInfo* next = info->next;
+	while (next != nullptr) {
+		--next->hook_count;
+		next = next->next;
+	}
+}
 
-
-	info->prev->next = info->next;
-	info->next->prev = info->prev;
-}*/
+void DeleteInlineHook(void* hook)
+{
+	InlineHookInfo* info = (InlineHookInfo*)hook;
+	if (info->hook_count == 1 && info->prev == nullptr) {
+		if (info->next == nullptr) { //没有下一个
+			ReadMemory(info->backups_inst, (void*)info->hook_addr, info->backups_len, false); //恢复原始指令
+		}
+		else {
+			SetNextInlineHookCount(info);
+			if (TEST_BIT0((uintptr_t)info->next->orig_addr)) {
+				info->next->orig_addr = (void*)SET_BIT0((uintptr_t)info->next->fix_inst_buf);
+				MakeThumbAbsoluteJump(info->hook_addr, SET_BIT0((uintptr_t)info->trampoline_func));
+			}
+			else {
+				info->next->orig_addr = info->next->fix_inst_buf;
+				MakeArmAbsoluteJump(info->hook_addr, (uintptr_t)info->trampoline_func);
+			}
+			info->next->prev = nullptr;
+		}
+	}
+	else {
+		if (info->next == nullptr) {
+			info->prev->next = nullptr;
+		}
+		else{
+			SetNextInlineHookCount(info);
+			info->next->orig_addr = info->orig_addr;
+			info->next->prev = info->prev;
+		}
+	}
+	MemoryFill(info, NULL, sizeof(InlineHookInfo), false);
+}
 

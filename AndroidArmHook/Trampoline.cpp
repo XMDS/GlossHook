@@ -57,10 +57,14 @@ __attribute__((naked)) static void arm_trampoline_manage_func()
 	);
 }
 
+uint8_t ThumbTrampolineManageFuncSize = ((uintptr_t)&thumb_trampoline_manage_func_end) - CLEAR_BIT0((uintptr_t)thumb_trampoline_manage_func);
+uint8_t ArmTrampolineManageFuncSize = ((uintptr_t)&arm_trampoline_manage_func_end) - (uintptr_t)arm_trampoline_manage_func;
+
+
 uint8_t MakeThumbTrampolineManageFunc(InlineHookInfo* info)
 {
 	uintptr_t func_addr = CLEAR_BIT0((uintptr_t)thumb_trampoline_manage_func);
-	uint8_t func_size = ((uintptr_t)&thumb_trampoline_manage_func_end) - func_addr;
+	uint8_t func_size = ThumbTrampolineManageFuncSize;
 	ReadMemory((void*)func_addr, info->trampoline_func, func_size, false);
 
 	uintptr_t trampoline_func_end_addr = (uintptr_t)info->trampoline_func + func_size;
@@ -73,7 +77,7 @@ uint8_t MakeThumbTrampolineManageFunc(InlineHookInfo* info)
 uint8_t MakeArmTrampolineManageFunc(InlineHookInfo* info)
 {
 	uintptr_t func_addr = (uintptr_t)arm_trampoline_manage_func;
-	uint8_t func_size = ((uintptr_t)&arm_trampoline_manage_func_end) - func_addr;
+	uint8_t func_size = ArmTrampolineManageFuncSize;
 	ReadMemory((void*)func_addr, info->trampoline_func, func_size, false);
 
 	uintptr_t trampoline_func_end_addr = (uintptr_t)info->trampoline_func + func_size;

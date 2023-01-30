@@ -75,8 +75,7 @@ lib_h GetLibHandle(const char* libName)
 void CloseLib(lib_h handle)
 {
     auto dl_handle = xdl_close(handle);
-    if (NULL != dl_handle)
-        dlclose(dl_handle);
+    if (NULL != dl_handle) dlclose(dl_handle);
     return;
 }
 
@@ -106,10 +105,10 @@ const char* GetLibFilePathFromHandle(lib_h handle)
     return info.dli_fname;
 }
 
-size_t GetLibFileSize(lib_h handle)
+size_t GetLibFileSize(const char* libName)
 {
     size_t size = 0;
-    FILE* file = fopen(GetLibFilePathFromHandle(handle), "r");
+    FILE* file = fopen(GetLibFilePathFromHandle(GetLibHandle(libName)), "r");
     if (file != NULL) {
         fseek(file, 0, SEEK_END);
         size = ftell(file);
@@ -140,21 +139,21 @@ size_t GetSymbolSize(lib_h handle, const char* name)
     return size;
 }
 
-size_t GetSymbolSizeEx(uintptr_t libAddr)
+size_t GetSymbolSizeEx(uintptr_t SymAddr)
 {
     xdl_info_t info;
     void* cache = NULL;
-    if (xdl_addr((void*)libAddr, &info, &cache) == 0)
+    if (xdl_addr((void*)SymAddr, &info, &cache) == 0)
         return NULL;
     xdl_addr_clean(&cache);
     return info.dli_ssize;
 }
 
-const char* GetSymbolName(uintptr_t libAddr)
+const char* GetSymbolName(uintptr_t SymAddr)
 {
     xdl_info_t info;
     void* cache = NULL;
-    if (xdl_addr((void*)libAddr, &info, &cache) == 0)
+    if (xdl_addr((void*)SymAddr, &info, &cache) == 0)
         return NULL;
     xdl_addr_clean(&cache);
     return info.dli_sname;
@@ -326,4 +325,16 @@ void RecoverHook(void* hook)
 {
     SetInlineHookState((InlineHookInfo*)hook, ENABLE_HOOK);
 }
+
+int GetThisInlineHookCount(void* hook)
+{
+    return reinterpret_cast<InlineHookInfo*>(hook)->hook_count;
+}
+
+int GetInlineHookTotalCount(void* addr, i_set inst_set)
+{
+    return GetLastInlineHook(addr, inst_set)->hook_count;
+}
+
+
 

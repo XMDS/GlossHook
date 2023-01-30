@@ -19,17 +19,20 @@ __attribute__((aligned(4))) struct InlineHookInfo
 	/* 0x14 */unsigned char backups_inst[MAX_BACKUPS_LEN];
 	/* 0x20 */uint8_t backups_len; //10 or 12
 	/* 0x24 */fix_inst_info fix_info;
-	/* 0x40 */InlineHookInfo* prev;
-	/* 0x44 */InlineHookInfo* next;
-	/* 0x48 */unsigned char trampoline_func[48];
-	/* 0x78 */unsigned char fix_inst_buf[MAX_INST_BUF_SIZE];
+	/* 0x44 */InlineHookInfo* prev;
+	/* 0x48 */InlineHookInfo* next;
+	/* 0x4C */unsigned char trampoline_func[48];
+	/* 0x7C */unsigned char fix_inst_buf[MAX_INST_BUF_SIZE];
 };
 
-constexpr int a = offsetof(InlineHookInfo, prev);
+constexpr int a = offsetof(InlineHookInfo, fix_inst_buf);
 
-void* InlineHookThumb(void* addr, void* func, void** original);
-void* InlineHookARM(void* addr, void* func, void** original);
+InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original);
+InlineHookInfo* InlineHookARM(void* addr, void* func, void** original);
+
 inline void SetInlineHookState(InlineHookInfo* info, bool state)
 {
 	info->hook_state = state;
 }
+
+InlineHookInfo* GetLastInlineHook(void* addr, i_set inst_set);

@@ -84,10 +84,10 @@ extern "C" {
 
 	/*
 	* Get the file size of the library based on the handle of the library.
-	* handle: Library handle (from 'GetLibHandle' func).
+	* libName: Library filename or pathname.
 	* return: Library file size.
 	*/
-	size_t GetLibFileSize(lib_h handle);
+	size_t GetLibFileSize(const char* libName);
 
 	/*
 	* Get the absolute address of symbol based on the symbol.
@@ -115,18 +115,17 @@ extern "C" {
 
 	/*
 	* According to the memory address of the library, obtain the size of the symbol code where the address is located in memory (the size in ELF, not the symbol itself).
-	* libAddr: Specifies a library-wide memory address.
-	* name: Symbol name.
+	* SymAddr: Specifies a Symbol-wide memory address.
 	* return: Symbol size.
 	*/
-	size_t GetSymbolSizeEx(uintptr_t libAddr);
+	size_t GetSymbolSizeEx(uintptr_t SymAddr);
 
 	/*
 	* Get the symbolic name where the address is located.
-	* libAddr: Specifies a library-wide memory address.
+	* SymAddr: Specifies a Symbol-wide memory address.
 	* return: Symbol name.
 	*/
-	const char* GetSymbolName(uintptr_t libAddr);
+	const char* GetSymbolName(uintptr_t SymAddr);
 
 	/*
 	* Set the access permission of the specified length of memory.
