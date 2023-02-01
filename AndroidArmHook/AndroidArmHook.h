@@ -18,7 +18,7 @@ extern "C" {
 #ifdef __arm__
 #define GET_INST_SET(addr) (addr & 1 ? i_set::$THUMB : i_set::$ARM)
 #endif
-	
+
 	typedef void* lib_h;
 	typedef struct PermissionFlags
 	{
@@ -202,9 +202,19 @@ extern "C" {
 	*/
 	void PLTInternal(void* addr, void* func, void** original);
 
+
+#define GET_ORIG_ADDR(original) decltype(original)(GetInlineHook((void*)original))
+
+                                                                           
+
+	
 	void* InlineHookSymAddr(void* sym_addr, void* new_func, void** original);
 	void CancelHook(void* hook);
 	void RecoverHook(void* hook);
+	void DeleteHook(void* hook);
+
+	void* GetInlineHook(void* orig_addr);
+	
 
 #ifdef __cplusplus
 	}

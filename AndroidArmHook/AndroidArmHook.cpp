@@ -313,7 +313,7 @@ void* InlineHookSymAddr(void* sym_addr, void* new_func, void** original)
 
 void* InlineHookFuncAddr(void* func_addr, void* new_func, void** original, i_set inst_set)
 {
-
+  
 }
 
 void CancelHook(void* hook)
@@ -326,6 +326,11 @@ void RecoverHook(void* hook)
     SetInlineHookState((InlineHookInfo*)hook, ENABLE_HOOK);
 }
 
+void DeleteHook(void* hook)
+{
+    return DeleteInlineHook(hook);
+}
+
 int GetThisInlineHookCount(void* hook)
 {
     return reinterpret_cast<InlineHookInfo*>(hook)->hook_count;
@@ -335,6 +340,15 @@ int GetInlineHookTotalCount(void* addr, i_set inst_set)
 {
     return GetLastInlineHook(addr, inst_set)->hook_count;
 }
+
+void* GetInlineHook(void* orig_addr)
+{
+    return HookLists.list[orig_addr]->result_addr;
+}
+
+
+
+
 
 
 

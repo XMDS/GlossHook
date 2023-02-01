@@ -6,12 +6,7 @@
 #include "Trampoline.h"
 #include "HLog.h"
 
-__attribute__((section(".inline_hook"))) static struct InlineHookList
-{
-	InlineHookInfo info[MAX_NUM_INLINE_HOOK];
-	uint16_t count = 0;
-} HookLists;
-
+__attribute__((section(".inline_hook"))) InlineHookList HookLists;
 
 static size_t FixOriginalInst(InlineHookInfo* info, fix_inst_info* fix_info, i_set inst_set)
 {
@@ -73,13 +68,13 @@ static size_t FixOriginalInst(InlineHookInfo* info, fix_inst_info* fix_info, i_s
 
 static InlineHookInfo* AllocateInlineHookInfo()
 {
-	if (HookLists.count >= MAX_NUM_INLINE_HOOK)
+	if (HookLists.id >= MAX_NUM_INLINE_HOOK)
 	{
 		HLOGE("The number of InlineHook has reached the memory limit, the maximum number is %d.", MAX_NUM_INLINE_HOOK);
 		return NULL;
 	}
 	
-	InlineHookInfo* info = &HookLists.info[HookLists.count++];
+	InlineHookInfo* info = &HookLists.info[HookLists.id++];
 	MemoryFill(info, NULL, sizeof(InlineHookInfo), false);
 	return info;
 }
@@ -102,24 +97,30 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 			MakeArmTrampolineManageFunc(info);
 		}
 		info->hook_count = 1;
+		info->result_addr = info->orig_addr;
+
+		HookLists.list[info->orig_addr] = info;
 	}
 	else if (jump == 0) {
 		if (inst_set == $THUMB) {
-			info->orig_addr = ReadMemory<void*>(info->hook_addr + (IS_ADDR_ALIGN_4(info->hook_addr) ? 4 : 2 + 4), false);
+			info->orig_addr = (void*)SET_BIT0((uintptr_t)info->fix_inst_buf); //thumb + 1
+			info->result_addr = ReadMemory<void*>(info->hook_addr + (IS_ADDR_ALIGN_4(info->hook_addr) ? 4 : 2 + 4), false);
 			uint8_t size = MakeThumbTrampolineManageFunc(info);
-			info->prev = ReadMemory<InlineHookInfo*>(CLEAR_BIT0((uintptr_t)info->orig_addr) + size - 4, false);
+			info->prev = ReadMemory<InlineHookInfo*>(CLEAR_BIT0((uintptr_t)info->result_addr) + size - 4, false);
 		}
 		else {
-			info->orig_addr = ReadMemory<void*>(info->hook_addr + 4, false);
+			info->orig_addr = info->fix_inst_buf;
+			info->result_addr = ReadMemory<void*>(info->hook_addr + 4, false);
 			uint8_t size = MakeArmTrampolineManageFunc(info);
-			info->prev = ReadMemory<InlineHookInfo*>((uintptr_t)info->orig_addr + size - 4, false);
+			info->prev = ReadMemory<InlineHookInfo*>((uintptr_t)info->result_addr + size - 4, false);
 		}
+		HookLists.list[info->orig_addr] = info;
+
 		info->hook_count = info->prev->hook_count + 1;
 		info->prev->next = info;
 		info->backups_len = info->prev->backups_len;
 		ReadMemory(info->prev->backups_inst, info->backups_inst, info->backups_len, false);
 		ReadMemory(info->prev->fix_inst_buf, info->fix_inst_buf, MAX_INST_BUF_SIZE, false);
-
 		return 0;
 	}
 	else {
@@ -202,7 +203,7 @@ InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 	}
 	int ret = SetInlineHookInfo(info, addr, func, $THUMB);
 	if (ret == -1) {
-		--HookLists.count;
+		--HookLists.id;
 		return nullptr;
 	}
 	if (original != NULL) *original = info->orig_addr;
@@ -212,8 +213,11 @@ InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 		return info;
 	}
 
+	HLOGI("Hook %4X", ReadMemory<uintptr_t>(info->trampoline_func, false));
+
 	size_t fix_len = FixOriginalInst(info, &info->fix_info, $THUMB);
 	Unprotect((uintptr_t)info->fix_inst_buf, sizeof(info->fix_inst_buf));
+	
 
 	int jump_len = IS_ADDR_ALIGN_4(info->hook_addr) ? 8 : 2 + 8;
 	MakeThumbAbsoluteJump((uintptr_t)info->fix_inst_buf + fix_len, SET_BIT0(info->hook_addr + jump_len));
@@ -239,7 +243,7 @@ InlineHookInfo* InlineHookARM(void* addr, void* func, void** original)
 
 	int ret = SetInlineHookInfo(info, addr, func, $ARM);
 	if (ret == -1) {
-		--HookLists.count;
+		--HookLists.id;
 		return nullptr;
 	}
 	if (original != NULL) *original = info->orig_addr;
@@ -257,7 +261,8 @@ InlineHookInfo* InlineHookARM(void* addr, void* func, void** original)
 	return info;
 }
 
-InlineHookInfo* GetInlineHook(void* addr, int count, i_set inst_set)
+
+static InlineHookInfo* GetInlineHook(void* addr, int count, i_set inst_set)
 {
 	InlineHookInfo* info = GetLastInlineHook(addr, inst_set);
 	if (info == nullptr) return nullptr;
@@ -272,10 +277,17 @@ InlineHookInfo* GetInlineHook(void* addr, int count, i_set inst_set)
 
 InlineHookInfo* GetLastInlineHook(void* addr, i_set inst_set)
 {
-	if (inst_set == $THUMB)
-		return ReadMemory<InlineHookInfo*>(CLEAR_BIT0((uintptr_t)addr) + ThumbTrampolineManageFuncSize - 4, false);
-	else
-		return ReadMemory<InlineHookInfo*>((uintptr_t)addr + ArmTrampolineManageFuncSize - 4, false);
+	if (CheckAbsoluteJump((uintptr_t)addr) == 0) {
+		if (inst_set == $THUMB) {
+			uintptr_t result_addr = ReadMemory<uintptr_t>((uintptr_t)addr + (IS_ADDR_ALIGN_4(CLEAR_BIT0((uintptr_t)addr)) ? 4 : 2 + 4), false);
+			return ReadMemory<InlineHookInfo*>(CLEAR_BIT0(result_addr) + GetThumbTrampolineManageFuncSize() - 4, false);
+		}
+		else {
+			uintptr_t result_addr = ReadMemory<uintptr_t>((uintptr_t)addr + 4, false);
+			return ReadMemory<InlineHookInfo*>(result_addr + GetArmTrampolineManageFuncSize() - 4, false);
+		}
+	}
+	return nullptr;
 }
 
 
@@ -287,6 +299,7 @@ static void SetNextInlineHookCount(InlineHookInfo* info) {
 	}
 }
 
+
 void DeleteInlineHook(void* hook)
 {
 	InlineHookInfo* info = (InlineHookInfo*)hook;
@@ -296,14 +309,18 @@ void DeleteInlineHook(void* hook)
 		}
 		else {
 			SetNextInlineHookCount(info);
-			if (TEST_BIT0((uintptr_t)info->next->orig_addr)) {
-				info->next->orig_addr = (void*)SET_BIT0((uintptr_t)info->next->fix_inst_buf);
+			info->next->result_addr = info->next->orig_addr;
+			TEST_BIT0((uintptr_t)info->next->result_addr) ? MakeThumbAbsoluteJump(info->hook_addr, SET_BIT0((uintptr_t)info->trampoline_func)) :
+				MakeArmAbsoluteJump(info->hook_addr, (uintptr_t)info->trampoline_func);
+			/*
+			if (TEST_BIT0((uintptr_t)info->next->result_addr)) {
+				info->next->result_addr = info->next->orig_addr;
 				MakeThumbAbsoluteJump(info->hook_addr, SET_BIT0((uintptr_t)info->trampoline_func));
 			}
 			else {
-				info->next->orig_addr = info->next->fix_inst_buf;
+				info->next->orig_addr = info->next->orig_addr;
 				MakeArmAbsoluteJump(info->hook_addr, (uintptr_t)info->trampoline_func);
-			}
+			}*/
 			info->next->prev = nullptr;
 		}
 	}
@@ -313,8 +330,9 @@ void DeleteInlineHook(void* hook)
 		}
 		else{
 			SetNextInlineHookCount(info);
-			info->next->orig_addr = info->orig_addr;
+			info->next->result_addr = info->result_addr;
 			info->next->prev = info->prev;
+			info->prev->next = info->next;
 		}
 	}
 	MemoryFill(info, NULL, sizeof(InlineHookInfo), false);
