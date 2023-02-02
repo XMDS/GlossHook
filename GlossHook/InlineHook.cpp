@@ -1,76 +1,18 @@
 //Android (thumb/arm/arm64) Inline Hook
 //by: XMDS 2022-12-14
 #include "InlineHook.h"
-#include "AndroidArmHook.h"
+#include "GlossHook.h"
 #include "Instruction.h"
 #include "Trampoline.h"
-#include "HLog.h"
+#include "GLog.h"
 
 __attribute__((section(".inline_hook"))) InlineHookList HookLists;
-
-static size_t FixOriginalInst(InlineHookInfo* info, fix_inst_info* fix_info, i_set inst_set)
-{
-	size_t fix_len = 0;
-	int fix_pos = 0;
-	uintptr_t backups_addr = (uintptr_t)info->backups_inst;
-	union { uint16_t t_buf[16]; uint32_t a_buf[9]{0}; } buf;
-
-	if (inst_set == $THUMB) {
-		uintptr_t pc = GET_THUMB_PC(info->hook_addr);
-
-		for (int backups_pos = 0; backups_pos < info->backups_len; backups_addr = (uintptr_t)info->backups_inst + backups_pos, fix_pos += fix_len)
-		{
-			if (IsThumb32(backups_addr))
-			{
-				HLOGD("backups_inst = %10p", ReadMemory<uint32_t>((backups_addr)));
-				i_type type = GetThumb32InstType(backups_addr);
-				uint16_t high = ReadMemory<uint16_t>(backups_addr, false);
-				uint16_t low = ReadMemory<uint16_t>(backups_addr + 2, false);
-				fix_len = FixThumb32Inst(buf.t_buf, high, low, pc, type, fix_info);
-				backups_pos += 4;
-				pc += 4;
-				ReadMemory(buf.t_buf, info->fix_inst_buf + fix_pos, fix_len, false);
-				HLOGD("fix_inst_t32 = %10p", ReadMemory<uint32_t>((uintptr_t)(info->fix_inst_buf + fix_pos)));
-			}
-			else {
-				HLOGD("backups_inst = %10p", ReadMemory<uint16_t>((backups_addr)));
-				i_type type = GetThumb16InstType(backups_addr);
-				uint16_t inst = ReadMemory<uint16_t>(backups_addr, false);
-				fix_len = FixThumb16Inst(buf.t_buf, inst, pc, type, fix_info);
-				backups_pos += 2;
-				pc += 2;
-				ReadMemory(buf.t_buf, info->fix_inst_buf + fix_pos, fix_len, false);
-				HLOGD("fix_inst_t16 = %10p", ReadMemory<uint16_t>((uintptr_t)(info->fix_inst_buf + fix_pos)));
-			}
-		}
-	
-	}
-	else { //arm
-		uintptr_t pc = GET_ARM_PC(info->hook_addr);
-
-		for (int backups_pos = 0; backups_pos < info->backups_len; backups_addr = (uintptr_t)info->backups_inst + backups_pos, fix_pos += fix_len)
-		{
-			HLOGD("backups_inst = %10p", ReadMemory<uint32_t>((backups_addr)));
-			i_type type = GetArmInstType(backups_addr);
-			uint32_t inst = ReadMemory<uint32_t>(backups_addr, false);
-			fix_len = FixArmInst(buf.a_buf, inst, pc, type, fix_info);
-			backups_pos += 4;
-			pc += 4;
-			ReadMemory(buf.a_buf, info->fix_inst_buf + fix_pos, fix_len, false);
-			HLOGD("fix_inst_t16 = %10p", ReadMemory<uint32_t>((uintptr_t)(info->fix_inst_buf + fix_pos)));
-		}
-	}
-	
-	
-	HLOGD("fix_pos = %10p", fix_pos);
-	return fix_pos;
-}
 
 static InlineHookInfo* AllocateInlineHookInfo()
 {
 	if (HookLists.id >= MAX_NUM_INLINE_HOOK)
 	{
-		HLOGE("The number of InlineHook has reached the memory limit, the maximum number is %d.", MAX_NUM_INLINE_HOOK);
+		GLOGE("The number of InlineHook has reached the memory limit, the maximum number is %d.", MAX_NUM_INLINE_HOOK);
 		return NULL;
 	}
 	
@@ -85,7 +27,8 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 	info->hook_addr = (uintptr_t)addr;
 	info->func_addr = func;
 	info->prev = nullptr, info->next = nullptr;
-	
+	Unprotect((uintptr_t)info->fix_inst_buf, sizeof(info->fix_inst_buf));
+
 	auto jump = CheckAbsoluteJump(info->hook_addr);//Has the current address been Hooked.
 	if (jump == -2) {
 		if (inst_set == $THUMB) {
@@ -98,8 +41,7 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 		}
 		info->hook_count = 1;
 		info->result_addr = info->orig_addr;
-
-		HookLists.list[info->orig_addr] = info;
+		HookLists.list[info->orig_addr] = info; //
 	}
 	else if (jump == 0) {
 		if (inst_set == $THUMB) {
@@ -115,7 +57,6 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 			info->prev = ReadMemory<InlineHookInfo*>((uintptr_t)info->result_addr + size - 4, false);
 		}
 		HookLists.list[info->orig_addr] = info;
-
 		info->hook_count = info->prev->hook_count + 1;
 		info->prev->next = info;
 		info->backups_len = info->prev->backups_len;
@@ -124,7 +65,7 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 		return 0;
 	}
 	else {
-		HLOGE("Hook failed. Please do not overwrite the previous or next instruction of Trampoline (currently: %d), this will cause the hook to crash.", jump);
+		GLOGE("Hook failed. Please do not overwrite the previous or next instruction of Trampoline (currently: %d), this will cause the hook to crash.", jump);
 		return -1;
 	}
 
@@ -166,7 +107,7 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 				info->fix_info.fix_inst_len[count++] = len;
 				info->fix_info.fix_inst_len[count++] = 0; //thumb32 fix
 				backups_pos += 4;
-				HLOGI("inst_len = %10p", len);
+				GLOGI("inst_len = %10p", len);
 
 			}
 			else {
@@ -174,7 +115,7 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 				size_t len = GetThumb16FixInstLen(type);
 				info->fix_info.fix_inst_len[count++] = len;
 				backups_pos += 2;
-				HLOGI("inst_len = %10p", len);
+				GLOGI("inst_len = %10p", len);
 			}
 		}
 		else {
@@ -182,11 +123,69 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 			size_t len = GetArmFixInstLen(type);
 			info->fix_info.fix_inst_len[count++] = len;
 			backups_pos += 4;
-			HLOGI("inst_len = %10p", len);
+			GLOGI("inst_len = %10p", len);
 		}
 	}
-	HLOGI("backups_len = %10p", info->backups_len);
+	GLOGI("backups_len = %10p", info->backups_len);
 	return 1;
+}
+
+static size_t FixOriginalInst(InlineHookInfo* info, fix_inst_info* fix_info, i_set inst_set)
+{
+	size_t fix_len = 0;
+	int fix_pos = 0;
+	uintptr_t backups_addr = (uintptr_t)info->backups_inst;
+	union { uint16_t t_buf[16]; uint32_t a_buf[9]{ 0 }; } buf;
+
+	if (inst_set == $THUMB) {
+		uintptr_t pc = GET_THUMB_PC(info->hook_addr);
+
+		for (int backups_pos = 0; backups_pos < info->backups_len; backups_addr = (uintptr_t)info->backups_inst + backups_pos, fix_pos += fix_len)
+		{
+			if (IsThumb32(backups_addr))
+			{
+				GLOGD("backups_inst = %10p", ReadMemory<uint32_t>((backups_addr)));
+				i_type type = GetThumb32InstType(backups_addr);
+				uint16_t high = ReadMemory<uint16_t>(backups_addr, false);
+				uint16_t low = ReadMemory<uint16_t>(backups_addr + 2, false);
+				fix_len = FixThumb32Inst(buf.t_buf, high, low, pc, type, fix_info);
+				backups_pos += 4;
+				pc += 4;
+				ReadMemory(buf.t_buf, info->fix_inst_buf + fix_pos, fix_len, false);
+				GLOGD("fix_inst_t32 = %10p", ReadMemory<uint32_t>((uintptr_t)(info->fix_inst_buf + fix_pos)));
+			}
+			else {
+				GLOGD("backups_inst = %10p", ReadMemory<uint16_t>((backups_addr)));
+				i_type type = GetThumb16InstType(backups_addr);
+				uint16_t inst = ReadMemory<uint16_t>(backups_addr, false);
+				fix_len = FixThumb16Inst(buf.t_buf, inst, pc, type, fix_info);
+				backups_pos += 2;
+				pc += 2;
+				ReadMemory(buf.t_buf, info->fix_inst_buf + fix_pos, fix_len, false);
+				GLOGD("fix_inst_t16 = %10p", ReadMemory<uint16_t>((uintptr_t)(info->fix_inst_buf + fix_pos)));
+			}
+		}
+
+	}
+	else { //arm
+		uintptr_t pc = GET_ARM_PC(info->hook_addr);
+
+		for (int backups_pos = 0; backups_pos < info->backups_len; backups_addr = (uintptr_t)info->backups_inst + backups_pos, fix_pos += fix_len)
+		{
+			GLOGD("backups_inst = %10p", ReadMemory<uint32_t>((backups_addr)));
+			i_type type = GetArmInstType(backups_addr);
+			uint32_t inst = ReadMemory<uint32_t>(backups_addr, false);
+			fix_len = FixArmInst(buf.a_buf, inst, pc, type, fix_info);
+			backups_pos += 4;
+			pc += 4;
+			ReadMemory(buf.a_buf, info->fix_inst_buf + fix_pos, fix_len, false);
+			GLOGD("fix_inst_t16 = %10p", ReadMemory<uint32_t>((uintptr_t)(info->fix_inst_buf + fix_pos)));
+		}
+	}
+
+
+	GLOGD("fix_pos = %10p", fix_pos);
+	return fix_pos;
 }
 
 InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
@@ -206,6 +205,8 @@ InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 		--HookLists.id;
 		return nullptr;
 	}
+	
+	
 	if (original != NULL) *original = info->orig_addr;
 
 	if (!ret && info->prev != nullptr) {
@@ -213,10 +214,7 @@ InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 		return info;
 	}
 
-	HLOGI("Hook %4X", ReadMemory<uintptr_t>(info->trampoline_func, false));
-
 	size_t fix_len = FixOriginalInst(info, &info->fix_info, $THUMB);
-	Unprotect((uintptr_t)info->fix_inst_buf, sizeof(info->fix_inst_buf));
 	
 
 	int jump_len = IS_ADDR_ALIGN_4(info->hook_addr) ? 8 : 2 + 8;
@@ -254,24 +252,9 @@ InlineHookInfo* InlineHookARM(void* addr, void* func, void** original)
 	}
 
 	size_t fix_len = FixOriginalInst(info, &info->fix_info, $ARM);
-	Unprotect((uintptr_t)info->fix_inst_buf, sizeof(info->fix_inst_buf));
 
 	MakeArmAbsoluteJump((uintptr_t)info->fix_inst_buf + fix_len, info->hook_addr + info->backups_len);
 	MakeArmAbsoluteJump(info->hook_addr, (uintptr_t)info->trampoline_func);
-	return info;
-}
-
-
-static InlineHookInfo* GetInlineHook(void* addr, int count, i_set inst_set)
-{
-	InlineHookInfo* info = GetLastInlineHook(addr, inst_set);
-	if (info == nullptr) return nullptr;
-
-	while (info->hook_count != count) {
-		info = info->prev;
-		if (info == nullptr) break;
-	}
-
 	return info;
 }
 
@@ -290,7 +273,6 @@ InlineHookInfo* GetLastInlineHook(void* addr, i_set inst_set)
 	return nullptr;
 }
 
-
 static void SetNextInlineHookCount(InlineHookInfo* info) {
 	InlineHookInfo* next = info->next;
 	while (next != nullptr) {
@@ -300,41 +282,33 @@ static void SetNextInlineHookCount(InlineHookInfo* info) {
 }
 
 
-void DeleteInlineHook(void* hook)
+void DeleteInlineHook(InlineHookInfo* hook)
 {
-	InlineHookInfo* info = (InlineHookInfo*)hook;
-	if (info->hook_count == 1 && info->prev == nullptr) {
-		if (info->next == nullptr) { //没有下一个
-			ReadMemory(info->backups_inst, (void*)info->hook_addr, info->backups_len, false); //恢复原始指令
+	InlineHookInfo* current = hook;
+	if (current->hook_count == 1 && current->prev == nullptr) {
+		if (current->next == nullptr) { //没有下一个
+			ReadMemory(current->backups_inst, (void*)current->hook_addr, current->backups_len, false); //恢复原始指令
 		}
 		else {
-			SetNextInlineHookCount(info);
-			info->next->result_addr = info->next->orig_addr;
-			TEST_BIT0((uintptr_t)info->next->result_addr) ? MakeThumbAbsoluteJump(info->hook_addr, SET_BIT0((uintptr_t)info->trampoline_func)) :
-				MakeArmAbsoluteJump(info->hook_addr, (uintptr_t)info->trampoline_func);
-			/*
-			if (TEST_BIT0((uintptr_t)info->next->result_addr)) {
-				info->next->result_addr = info->next->orig_addr;
-				MakeThumbAbsoluteJump(info->hook_addr, SET_BIT0((uintptr_t)info->trampoline_func));
-			}
-			else {
-				info->next->orig_addr = info->next->orig_addr;
-				MakeArmAbsoluteJump(info->hook_addr, (uintptr_t)info->trampoline_func);
-			}*/
-			info->next->prev = nullptr;
+			SetNextInlineHookCount(current);
+			current->next->result_addr = current->next->orig_addr;
+			TEST_BIT0((uintptr_t)current->next->result_addr) ? MakeThumbAbsoluteJump(current->hook_addr, SET_BIT0((uintptr_t)current->next->trampoline_func)) :
+				MakeArmAbsoluteJump(current->hook_addr, (uintptr_t)current->next->trampoline_func);
+			current->next->prev = nullptr;
 		}
 	}
 	else {
-		if (info->next == nullptr) {
-			info->prev->next = nullptr;
+		if (current->next == nullptr) {
+			current->prev->next = nullptr;
+			(TEST_BIT0((uintptr_t)current->result_addr) ? MakeThumbAbsoluteJump : MakeArmAbsoluteJump)(current->hook_addr, (uintptr_t)current->result_addr);
 		}
 		else{
-			SetNextInlineHookCount(info);
-			info->next->result_addr = info->result_addr;
-			info->next->prev = info->prev;
-			info->prev->next = info->next;
+			SetNextInlineHookCount(current);
+			current->next->result_addr = current->result_addr;
+			current->next->prev = current->prev;
+			current->prev->next = current->next;
 		}
 	}
-	MemoryFill(info, NULL, sizeof(InlineHookInfo), false);
+	MemoryFill(current, NULL, sizeof(InlineHookInfo), false);
 }
 

@@ -1,6 +1,6 @@
 #pragma once
-#include "FixInst.hpp"
 #include <map>
+#include "FixInst.hpp"
 
 #define MAX_NUM_INLINE_HOOK 2048
 #define MAX_BACKUPS_LEN 12
@@ -47,6 +47,5 @@ inline void SetInlineHookState(InlineHookInfo* info, bool state)
 	info->hook_state = state;
 }
 
-
-void DeleteInlineHook(void* hook);
+void DeleteInlineHook(InlineHookInfo* hook);
 InlineHookInfo* GetLastInlineHook(void* addr, i_set inst_set);

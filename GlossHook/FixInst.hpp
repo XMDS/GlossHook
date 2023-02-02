@@ -1,5 +1,5 @@
 #pragma once
-#include "AndroidArmHook.h"
+#include "GlossHook.h"
 #include "Instruction.h"
 
 namespace Inst

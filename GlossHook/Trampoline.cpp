@@ -1,6 +1,5 @@
 #include "Trampoline.h"
-#include "AndroidArmHook.h"
-#include "HLog.h"
+#include "GlossHook.h"
 
 __attribute__((section(".text"))) __attribute__((visibility("hidden"))) extern void* thumb_trampoline_manage_func_end;
 __attribute__((section(".text"))) __attribute__((target("thumb")))
@@ -73,10 +72,9 @@ uint8_t MakeThumbTrampolineManageFunc(InlineHookInfo* info)
 {
 	uintptr_t func_addr = CLEAR_BIT0((uintptr_t)thumb_trampoline_manage_func);
 	uint8_t func_size = GetThumbTrampolineManageFuncSize();
-	ReadMemory((void*)func_addr, info->trampoline_func, func_size, true);
 	Unprotect((uintptr_t)info->trampoline_func, sizeof(info->trampoline_func));
-	HLOGI("Hook %4X", ReadMemory<uintptr_t>(info->trampoline_func, false));
-	HLOGI("Hook %4X", GetThumbTrampolineManageFuncSize(), false);
+	ReadMemory((void*)func_addr, info->trampoline_func, func_size, true);
+
 	uintptr_t trampoline_func_end_addr = (uintptr_t)info->trampoline_func + func_size;
 	uintptr_t trampoline_inline_hook_info_ptr = trampoline_func_end_addr - 4;
 	WriteMemory<InlineHookInfo*>(trampoline_inline_hook_info_ptr, info);
@@ -88,6 +86,7 @@ uint8_t MakeArmTrampolineManageFunc(InlineHookInfo* info)
 {
 	uintptr_t func_addr = (uintptr_t)arm_trampoline_manage_func;
 	uint8_t func_size = GetArmTrampolineManageFuncSize();
+	Unprotect((uintptr_t)info->trampoline_func, sizeof(info->trampoline_func));
 	ReadMemory((void*)func_addr, info->trampoline_func, func_size, false);
 
 	uintptr_t trampoline_func_end_addr = (uintptr_t)info->trampoline_func + func_size;
