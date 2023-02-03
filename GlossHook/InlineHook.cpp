@@ -27,8 +27,11 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 	info->hook_addr = (uintptr_t)addr;
 	info->func_addr = func;
 	info->prev = nullptr, info->next = nullptr;
-	Unprotect((uintptr_t)info->fix_inst_buf, sizeof(info->fix_inst_buf));
-
+    
+    Unprotect(info->hook_addr, sizeof(uintptr_t));
+    Unprotect((uintptr_t)info->fix_inst_buf, sizeof(info->fix_inst_buf));
+    Unprotect((uintptr_t)info->backups_inst, sizeof(info->backups_inst));
+    
 	auto jump = CheckAbsoluteJump(info->hook_addr);//Has the current address been Hooked.
 	if (jump == -2) {
 		if (inst_set == $THUMB) {
@@ -60,8 +63,8 @@ static int SetInlineHookInfo(InlineHookInfo* info, void* addr, void* func, i_set
 		info->hook_count = info->prev->hook_count + 1;
 		info->prev->next = info;
 		info->backups_len = info->prev->backups_len;
-		ReadMemory(info->prev->backups_inst, info->backups_inst, info->backups_len, false);
-		ReadMemory(info->prev->fix_inst_buf, info->fix_inst_buf, MAX_INST_BUF_SIZE, false);
+        WriteMemory(info->backups_inst, info->prev->backups_inst, info->backups_len, false);
+		WriteMemory(info->fix_inst_buf, info->prev->fix_inst_buf, MAX_INST_BUF_SIZE, false);
 		return 0;
 	}
 	else {
@@ -200,13 +203,12 @@ InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 		WLOGE("Failed to allocate InlineHook information!!!");
 		return nullptr;
 	}
+    
 	int ret = SetInlineHookInfo(info, addr, func, $THUMB);
 	if (ret == -1) {
 		--HookLists.id;
 		return nullptr;
 	}
-	
-	
 	if (original != NULL) *original = info->orig_addr;
 
 	if (!ret && info->prev != nullptr) {
@@ -216,7 +218,6 @@ InlineHookInfo* InlineHookThumb(void* addr, void* func, void** original)
 
 	size_t fix_len = FixOriginalInst(info, &info->fix_info, $THUMB);
 	
-
 	int jump_len = IS_ADDR_ALIGN_4(info->hook_addr) ? 8 : 2 + 8;
 	MakeThumbAbsoluteJump((uintptr_t)info->fix_inst_buf + fix_len, SET_BIT0(info->hook_addr + jump_len));
 	int nop_len = info->backups_len - jump_len;
@@ -286,8 +287,8 @@ void DeleteInlineHook(InlineHookInfo* hook)
 {
 	InlineHookInfo* current = hook;
 	if (current->hook_count == 1 && current->prev == nullptr) {
-		if (current->next == nullptr) { //没有下一个
-			ReadMemory(current->backups_inst, (void*)current->hook_addr, current->backups_len, false); //恢复原始指令
+		if (current->next == nullptr) { //没锟斤拷锟斤拷一锟斤拷
+			WriteMemory((void*)current->hook_addr, current->backups_inst, current->backups_len, false); //锟街革拷原始指锟斤拷
 		}
 		else {
 			SetNextInlineHookCount(current);
