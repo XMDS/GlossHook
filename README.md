@@ -6,7 +6,7 @@ A simple Android arm Hook library.
 GlossHook仍然处于早期版本，虽然时间少，但尽量更新，更加完善和稳定.
 
 ### 特性
-* 支持thunb/arm(arm64待更新)的InlineHook
+* 支持thumb/arm的InlineHook(arm64待更新)
 * 目前仅支持对整个函数hook，对函数替换、注入等
 * 支持对同一个函数多次hook.
 * 同一个函数有多个hook时，
