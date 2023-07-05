@@ -1,4 +1,4 @@
-#include "GlossHook.h"
+#include "Gloss.h"
 
 #include <stdio.h> //snprintf fopen
 #include <string.h> //strcpy strstr
@@ -6,19 +6,19 @@
 #include <errno.h>
 #include <sys/mman.h> //mprotect
 
-#include "InlineHook.h"
-#include "Instruction.h"
+#include "GConst.h"
 #include "GLog.h"
-#include "xDL/xdl.h"
+#include "xdl/xdl.h"
 
-uintptr_t GetLibBase(const char* libName, pid_t pid)
+#ifdef __arm__
+uintptr_t GlossGetLibBase(const char* libName, pid_t pid)
 {
+    if (libName == NULL) return 0;
     uintptr_t address = 0;
-    char buffer[2048] = { 0 }, fname[2048] = { 0 };
-    if (pid < 0)
-        strcpy(fname, "/proc/self/maps");
-    else
-        snprintf(fname, sizeof(fname), "/proc/%d/maps", pid);
+    char buffer[2048] = { 0 }, fname[256] = { 0 };
+    bool is_self = (pid < 0);
+    snprintf(fname, sizeof(fname), is_self ? "/proc/self/maps" : "/proc/%d/maps", pid);
+
     FILE* fp = fopen(fname, "rt");
     if (fp != NULL)
     {
@@ -34,15 +34,17 @@ uintptr_t GetLibBase(const char* libName, pid_t pid)
     }
     return address;
 }
+#endif // __arm__
 
-size_t GetLibLength(const char* libName, pid_t pid)
+size_t GlossGetLibLength(const char* libName, pid_t pid)
 {
-    uintptr_t address = 0, end_address = 0;
+    if (libName == NULL) return 0;
+    uintptr_t start_address = 0, end_address = 0;
+    size_t total_length = 0;
     char buffer[2048] = { 0 }, fname[2048] = { 0 };
-    if (pid < 0)
-        strcpy(fname, "/proc/self/maps");
-    else
-        snprintf(fname, sizeof(fname), "/proc/%d/maps", pid);
+    bool is_self = (pid < 0);
+    snprintf(fname, sizeof(fname), is_self ? "/proc/self/maps" : "/proc/%d/maps", pid);
+
     FILE* fp = fopen(fname, "rt");
     if (fp != NULL)
     {
@@ -51,20 +53,38 @@ size_t GetLibLength(const char* libName, pid_t pid)
             if (strstr(buffer, libName))
             {
                 const char* secondPart = strchr(buffer, '-');
-                if (!address)
-                    end_address = address = (uintptr_t)strtoul(buffer, NULL, 16);
-                if (secondPart != NULL)
+                start_address = (uintptr_t)strtoul(buffer, NULL, 16);
+                if (secondPart != NULL) {
                     end_address = (uintptr_t)strtoul(secondPart + 1, NULL, 16);
+                    total_length += end_address - start_address;
+                }
             }
         }
         fclose(fp);
     }
-    return end_address - address;
+    return total_length;
 }
 
-lib_h GetLibHandle(const char* libName)
+uintptr_t GlossGetLibBias(const char* libName)
 {
-    void* xdl_handle = xdl_open(libName, XDL_TRY_FORCE_LOAD);
+    gloss_lib handle = GlossOpen(libName);
+    if (NULL == handle) return 0;
+    uintptr_t address = GlossGetLibBiasEx(handle);
+    GlossClose(handle, false);
+    return address;
+}
+
+uintptr_t GlossGetLibBiasEx(gloss_lib handle)
+{
+    xdl_info_t info;
+    if (xdl_info(handle, XDL_DI_DLINFO, &info) == -1)
+        return 0;
+    return (uintptr_t)info.dli_fbase;
+}
+
+gloss_lib GlossOpen(const char* libName)
+{
+    gloss_lib xdl_handle = xdl_open(libName, XDL_TRY_FORCE_LOAD);
     if (NULL == xdl_handle) {
         if (NULL != dlopen(libName, RTLD_LAZY))
             xdl_handle = xdl_open(libName, XDL_DEFAULT);
@@ -72,22 +92,22 @@ lib_h GetLibHandle(const char* libName)
     return xdl_handle;
 }
 
-int CloseLib(lib_h handle, bool is_dlclose)
+int GlossClose(gloss_lib handle, bool is_dlclose)
 {
     auto dl_handle = xdl_close(handle);
-    if (NULL == dl_handle) return -1;
-    return is_dlclose ? dlclose(dl_handle) : 0;
+    if (dl_handle) return is_dlclose ? dlclose(dl_handle) : 0;
+    return 0;
 }
 
-uintptr_t GetLibBaseFromHandle(lib_h handle)
+const char* GlossGetLibPath(gloss_lib handle)
 {
     xdl_info_t info;
     if (xdl_info(handle, XDL_DI_DLINFO, &info) == -1)
         return NULL;
-    return (uintptr_t)info.dli_fbase;
+    return info.dli_fname;
 }
 
-const char* GetLibFilePath(uintptr_t libAddr)
+const char* GlossGetLibPathEx(uintptr_t libAddr)
 {
     xdl_info_t info;
     void* cache = NULL;
@@ -97,85 +117,68 @@ const char* GetLibFilePath(uintptr_t libAddr)
     return info.dli_fname;
 }
 
-const char* GetLibFilePathFromHandle(lib_h handle)
-{
-    xdl_info_t info;
-    if (xdl_info(handle, XDL_DI_DLINFO, &info) == -1)
-        return NULL;
-    return info.dli_fname;
-}
-
-size_t GetLibFileSize(const char* libName)
+size_t GlossGetLibFileSize(const char* libName)
 {
     size_t size = 0;
-    FILE* file = fopen(GetLibFilePathFromHandle(GetLibHandle(libName)), "r");
+    gloss_lib handle = GlossOpen(libName);
+    if (NULL == handle) return 0;
+    FILE* file = fopen(GlossGetLibPath(handle), "rb");
     if (file != NULL) {
         fseek(file, 0, SEEK_END);
         size = ftell(file);
         fclose(file);
     }
+    GlossClose(handle, false);
     return size;
 }
 
-uintptr_t GetSymbolAddr(lib_h handle, const char* name)
+uintptr_t GlossSymbol(gloss_lib handle, const char* name, size_t* sym_size)
 {
-    void* addr = xdl_sym(handle, name, NULL);
+    void* addr = xdl_sym(handle, name, sym_size);
     if (NULL == addr)
-        addr = xdl_dsym(handle, name, NULL);
+        addr = xdl_dsym(handle, name, sym_size);
     return (uintptr_t)addr;
 }
 
-uintptr_t GetSymbolAddrEx(uintptr_t libAddr, const char* name)
+uintptr_t GlossSymbolEx(uintptr_t libAddr, const char* name, size_t* sym_size)
 {
-    auto handle = GetLibHandle(GetLibFilePath(libAddr));
-    return NULL != handle ? GetSymbolAddr(handle, name) : NULL;
+    auto handle = GlossOpen(GlossGetLibPathEx(libAddr));
+    if (NULL == handle) return 0;
+    auto addr = GlossSymbol(handle, name, sym_size);
+    GlossClose(handle, false);
+    return addr;
 }
 
-size_t GetSymbolSize(lib_h handle, const char* name)
-{
-    size_t size = NULL;
-    if (NULL == xdl_sym(handle, name, &size))
-        xdl_dsym(handle, name, &size);
-    return size;
-}
-
-size_t GetSymbolSizeEx(uintptr_t SymAddr)
+const char* GlossAddrInfo(uintptr_t sym_addr, size_t* sym_size)
 {
     xdl_info_t info;
     void* cache = NULL;
-    if (xdl_addr((void*)SymAddr, &info, &cache) == 0)
+    if (xdl_addr((void*)sym_addr, &info, &cache) == 0)
         return NULL;
     xdl_addr_clean(&cache);
-    return info.dli_ssize;
-}
-
-const char* GetSymbolName(uintptr_t SymAddr)
-{
-    xdl_info_t info;
-    void* cache = NULL;
-    if (xdl_addr((void*)SymAddr, &info, &cache) == 0)
-        return NULL;
-    xdl_addr_clean(&cache);
+    if (sym_size != NULL)
+        *sym_size = info.dli_ssize;
     return info.dli_sname;
 }
 
+
 bool SetMemoryPermission(uintptr_t addr, size_t len, p_flag* type)
 {
-    if (addr == NULL || len == 0) return false;
+    if (!addr || !len) return false;
 
     int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     if (type != NULL) {
-        prot = PROT_NONE;
+        if (type->bPrivate)
+            prot = PROT_NONE;
+        if (type->bShared)
+            prot = PROT_READ | PROT_WRITE;
         if (type->bRead)
             prot |= PROT_READ;
         if (type->bWrite)
             prot |= PROT_WRITE;
         if (type->bExecute)
             prot |= PROT_EXEC;
-        if (type->bPrivate)
-            prot |= PROT_NONE;
-        if (type->bShared)
-            prot = PROT_READ | PROT_WRITE;
+
     }
     unsigned long PageSize = sysconf(_SC_PAGESIZE);
     const uintptr_t start = PAGE_START(addr, PageSize);
@@ -189,15 +192,14 @@ bool SetMemoryPermission(uintptr_t addr, size_t len, p_flag* type)
     return true;
 }
 
-p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
+bool GetMemoryPermission(uintptr_t addr, p_flag* type, pid_t pid)
 {
+    bool status = false;
+    if (!addr || !type) return status;
     char buffer[2048] = { 0 }, fname[2048] = { 0 };
     uintptr_t start_address, end_address;
-    p_flag* type = (p_flag*)calloc(1, sizeof(p_flag));
-    if (pid < 0)
-        strcpy(fname, "/proc/self/maps");
-    else
-        snprintf(fname, sizeof(fname), "/proc/%d/maps", pid);
+    bool is_self = (pid < 0);
+    snprintf(fname, sizeof(fname), is_self ? "/proc/self/maps" : "/proc/%d/maps", pid);
 
     FILE* fp = fopen(fname, "rt");
     if (fp != NULL) {
@@ -206,6 +208,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
                 start_address = strtoul(strtok(buffer, "-"), NULL, 16);
                 end_address = strtoul(strtok(NULL, " "), NULL, 16);
                 if (addr >= start_address && addr <= end_address) {
+                    status = true;
                     type->bPrivate = true;
                     break;
                 }
@@ -214,6 +217,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
                 start_address = strtoul(strtok(buffer, "-"), NULL, 16);
                 end_address = strtoul(strtok(NULL, " "), NULL, 16);
                 if (addr >= start_address && addr <= end_address) {
+                    status = true;
                     type->bRead = true;
                     type->bPrivate = true;
                     break;
@@ -223,6 +227,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
                 start_address = strtoul(strtok(buffer, "-"), NULL, 16);
                 end_address = strtoul(strtok(NULL, " "), NULL, 16);
                 if (addr >= start_address && addr <= end_address) {
+                    status = true;
                     type->bRead = true;
                     type->bWrite = true;
                     type->bPrivate = true;
@@ -233,6 +238,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
                 start_address = strtoul(strtok(buffer, "-"), NULL, 16);
                 end_address = strtoul(strtok(NULL, " "), NULL, 16);
                 if (addr >= start_address && addr <= end_address) {
+                    status = true;
                     type->bRead = true;
                     type->bExecute = true;
                     type->bPrivate = true;
@@ -243,6 +249,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
                 start_address = strtoul(strtok(buffer, "-"), NULL, 16);
                 end_address = strtoul(strtok(NULL, " "), NULL, 16);
                 if (addr >= start_address && addr <= end_address) {
+                    status = true;
                     type->bRead = true;
                     type->bWrite = true;
                     type->bExecute = true;
@@ -254,6 +261,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
                 start_address = strtoul(strtok(buffer, "-"), NULL, 16);
                 end_address = strtoul(strtok(NULL, " "), NULL, 16);
                 if (addr >= start_address && addr <= end_address) {
+                    status = true;
                     type->bRead = true;
                     type->bWrite = true;
                     type->bShared = true;
@@ -263,7 +271,7 @@ p_flag* GetMemoryPermission(uintptr_t addr, pid_t pid)
         }
         fclose(fp);
     }
-    return type;
+    return status;
 }
 
 void WriteMemory(void* addr, void* data, size_t size, bool vp)
@@ -286,108 +294,3 @@ void MemoryFill(void* addr, uint8_t value, size_t size, bool vp)
     memset(addr, value, size);
     cacheflush((uintptr_t)addr, (uintptr_t)addr + size, 0);
 }
-
-void GotHook(void* addr, void* func, void** original)
-{
-    if (addr == NULL || func == NULL) return;
-    Unprotect((uintptr_t)addr, sizeof(uintptr_t));
-    if (original != NULL)
-        *((uintptr_t*)original) = *(uintptr_t*)addr;
-    *(uintptr_t*)addr = (uintptr_t)func;
-    cacheflush((uintptr_t)addr, (uintptr_t)addr + sizeof(uintptr_t), 0);
-}
-
-//inline hook
-void* GlossHookSymAddr(void* sym_addr, void* new_func, void** original)
-{
-    //1.检测addr是T还是A模式
-    if (TEST_BIT0((uintptr_t)sym_addr)) {
-        return InlineHookThumb((void*)CLEAR_BIT0((uintptr_t)sym_addr), new_func, original);
-    }
-    else {
-        return InlineHookARM(sym_addr, new_func, original);
-    }
-    //2.检测符号大小
-    //3.短函数hook
-}
-
-void* GlossHookFuncAddr(void* func_addr, void* new_func, void** original, i_set inst_set)
-{
-  
-}
-
-void GlossHookCancel(void* hook)
-{
-    SetInlineHookState((InlineHookInfo*)hook, DISABLE_HOOK);
-}
-
-void GlossHookRecover(void* hook)
-{
-    SetInlineHookState((InlineHookInfo*)hook, ENABLE_HOOK);
-}
-
-void GlossHookDelete(void* hook)
-{
-    return DeleteInlineHook((InlineHookInfo*)hook);
-}
-
-void GlossHookCancelAll(void* addr, i_set inst_set)
-{
-    InlineHookInfo* hook = GetLastInlineHook(addr, inst_set);
-    while (hook != nullptr) {
-        SetInlineHookState(hook, DISABLE_HOOK);
-        hook = hook->prev;
-    }
-}
-
-void GlossHookRecoverAll(void* addr, i_set inst_set)
-{
-    InlineHookInfo* hook = GetLastInlineHook(addr, inst_set);
-    while (hook != nullptr) {
-        SetInlineHookState(hook, ENABLE_HOOK);
-        hook = hook->prev;
-    }
-}
-
-void GlossHookDeleteAll(void* addr, i_set inst_set)
-{
-    InlineHookInfo* hook = GetLastInlineHook(addr, inst_set);
-    while (hook != nullptr) {
-        DeleteInlineHook(hook);
-        hook = hook->prev;
-    }
-}
-
-int GlossHookGetCount(void* hook)
-{
-    return reinterpret_cast<InlineHookInfo*>(hook)->hook_count;
-}
-
-int GlossHookGetTotalCount(void* addr, i_set inst_set)
-{
-    return GetLastInlineHook(addr, inst_set)->hook_count;
-}
-
-void* GlossGetHook(void* addr, int count, i_set inst_set)
-{
-    InlineHookInfo* info = GetLastInlineHook(addr, inst_set);
-    if (info == nullptr) return nullptr;
-
-    while (info->hook_count != count) {
-        info = info->prev;
-        if (info == nullptr) break;
-    }
-    return info;
-}
-
-void* GlossGetResultAddr(void* orig_addr)
-{
-    return HookLists.list[orig_addr]->result_addr;
-}
-
-
-
-
-
-
-
