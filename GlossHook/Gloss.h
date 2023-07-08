@@ -19,6 +19,9 @@ extern "C" {
 
 #ifdef __arm__
 #define GET_INST_SET(addr) (addr & 1 ? i_set::$THUMB : i_set::$ARM)
+#define INST_SET i_set mode = $THUMB
+#elif __aarch64__
+#define INST_SET i_set mode = $ARM64
 #endif
 
 	typedef enum { NONE, $THUMB, $ARM, $ARM64 } i_set; //InstructionSet
@@ -50,7 +53,7 @@ extern "C" {
 		int64_t reg[34];
 		struct {
 			uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20,
-				x21, x22, x23, x24, x25, x26, x27, x28, fp, lr, sp, pc, cprs;
+				x21, x22, x23, x24, x25, x26, x27, x28, x29, lr, sp, pc, cprs;
 		} regs;
 #endif // __arm__
 	};
@@ -95,14 +98,14 @@ extern "C" {
 	void MemoryFill(void* addr, uint8_t value, size_t size, bool vp = true);
 	
 	void* GlossHookSymAddr(void* sym_addr, void* new_func, void** old_func);
-	void* GlossHookFuncAddr(void* func_addr, void* new_func, void** old_func, i_set mode, bool is_short_func);
+	void* GlossHookFuncAddr(void* func_addr, void* new_func, void** old_func, bool is_short_func, INST_SET);
 	
-	void* GlossHookBranchB(void* branch_addr, void* new_func, void** old_func, i_set mode);
-	void* GlossHookBranchBL(void* branch_addr, void* new_func, void** old_func, i_set mode);
+	void* GlossHookBranchB(void* branch_addr, void* new_func, void** old_func, INST_SET);
+	void* GlossHookBranchBL(void* branch_addr, void* new_func, void** old_func, INST_SET);
 #ifdef __arm__
 	void* GlossHookBranchBLX(void* branch_addr, void* new_func, void** old_func, i_set mode);
-	void* GlossHookPatch(void* patch_addr, void* new_func, i_set mode, bool is_short_func);
 #endif // __arm__
+	void* GlossHookPatch(void* patch_addr, void* new_func, bool is_short_func, INST_SET);
 
 	void* GlossGotHookAddr(void* got_addr, void* new_func, void** old_func);
 	void* GlossGotHookSym(const char* lib_name, const char* sym_name, void* new_func, void** old_func);
@@ -111,7 +114,14 @@ extern "C" {
 	void GlossHookEnable(void* hook);
 	void GlossHookDelete(void* hook);
 
-	
+	void GlossHookDisableAll(void* addr, INST_SET);
+	void GlossHookEnableAll(void* addr, INST_SET);
+	void GlossHookDeleteAll(void* addr, INST_SET);
+	int GlossHookGetCount(void* hook);
+	int GlossHookGetTotalCount(void* addr, INST_SET);
+	void* GlossGetHookPtr(void* addr, int count, INST_SET);
+
+	void GlossHookSetNewFunc(void* hook, void* new_func);
 
 #ifdef __cplusplus
 }
@@ -130,7 +140,7 @@ extern "C" {
 	template <typename T1>
 	inline static T1 ReadMemory(uintptr_t addr, bool vp = true)
 	{
-		if (vp) Unprotect((uintptr_t)addr, sizeof(addr));
+		if (vp) Unprotect((uintptr_t)addr, sizeof(T1));
 		return *reinterpret_cast<T1*>(addr);
 	}
 
