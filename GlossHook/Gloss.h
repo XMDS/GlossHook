@@ -46,14 +46,16 @@ extern "C" {
 		struct { uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, lr, pc, cprs; } regs;
 #elif __aarch64__
 		enum e_reg {
-			X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28,
-			X29, FP = X29, X30, LR = X30, X31, SP = X31, PC, CPSR
+			X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28, X29, FP = X29,
+			Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10, Q11, Q12, Q13, Q14, Q15, Q16, Q17, Q18, Q19, Q20, Q21, Q22, Q23, Q24, Q25, Q26, Q27, Q28, Q29, Q30, Q31,
+			X30, LR = X30, X31, SP = X31, PC, CPSR
 		};
 
-		int64_t reg[34];
+		int64_t reg[66];
 		struct {
-			uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20,
-				x21, x22, x23, x24, x25, x26, x27, x28, x29, lr, sp, pc, cprs;
+			uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29, 
+				q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27, q28, q29, q30, q31,
+				lr, sp, pc, cprs;
 		} regs;
 #endif // __arm__
 	};
@@ -97,15 +99,18 @@ extern "C" {
 	void* ReadMemory(void* addr, void* data, size_t size, bool vp = true);
 	void MemoryFill(void* addr, uint8_t value, size_t size, bool vp = true);
 	
-	void* GlossHookSymAddr(void* sym_addr, void* new_func, void** old_func);
-	void* GlossHookFuncAddr(void* func_addr, void* new_func, void** old_func, bool is_short_func, INST_SET);
+	void* GlossHookSym(void* sym_addr, void* new_func, void** old_func);
+	void* GlossHookAddr(void* func_addr, void* new_func, void** old_func, bool is_short_func, INST_SET);
 	
 	void* GlossHookBranchB(void* branch_addr, void* new_func, void** old_func, INST_SET);
 	void* GlossHookBranchBL(void* branch_addr, void* new_func, void** old_func, INST_SET);
 #ifdef __arm__
 	void* GlossHookBranchBLX(void* branch_addr, void* new_func, void** old_func, i_set mode);
 #endif // __arm__
-	void* GlossHookPatch(void* patch_addr, void* new_func, bool is_short_func, INST_SET);
+
+	typedef void (*GlossHookPatchCallback)(gloss_reg* regs, void* hook);
+	void* GlossHookPatch(void* patch_addr, GlossHookPatchCallback new_func, bool is_short_func, INST_SET);
+	void* GlossHookRedirect(void* redirect_addr, void* new_addr, INST_SET);
 
 	void* GlossGotHookAddr(void* got_addr, void* new_func, void** old_func);
 	void* GlossGotHookSym(const char* lib_name, const char* sym_name, void* new_func, void** old_func);
@@ -164,12 +169,12 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* InlineHook(A addr, B func, C original)
 	{
-		return GlossHookSymAddr(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
+		return GlossHookSym(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
 	}
 	template <class A, class B>
 	inline static void* InlineHook(A addr, B func)
 	{
-		return GlossHookSymAddr(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
+		return GlossHookSym(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
 	}
 #endif
 #endif
