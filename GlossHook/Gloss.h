@@ -15,7 +15,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <unistd.h> //lseek PAGE_SIZE
+#include <unistd.h>
 
 #ifdef __arm__
 #define GET_INST_SET(addr) (addr & 1 ? i_set::$THUMB : i_set::$ARM)
@@ -42,7 +42,7 @@ extern "C" {
 #ifdef __arm__
 		enum e_reg { R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, SP = R13, R14, LR = R14, R15, PC = R15, CPSR };
 
-		int32_t reg[17];
+		uint32_t reg[17];
 		struct { uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, lr, pc, cprs; } regs;
 #elif __aarch64__
 		enum e_reg {
@@ -51,16 +51,16 @@ extern "C" {
 			X30, LR = X30, X31, SP = X31, PC, CPSR
 		};
 
-		int64_t reg[66];
+		uint64_t reg[66];
 		struct {
-			uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29, 
-				q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27, q28, q29, q30, q31,
-				lr, sp, pc, cprs;
+			uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29;
+			double q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27, q28, q29, q30, q31;
+			uint64_t lr, sp, pc, cprs;
 		} regs;
 #endif // __arm__
 	};
 
-	//func
+	// library
 	uintptr_t GlossGetLibBase(const char* libName, pid_t pid = -1);
 	
 	size_t GlossGetLibLength(const char* libName, pid_t pid = -1);
@@ -78,7 +78,7 @@ extern "C" {
 	uintptr_t GlossSymbolEx(uintptr_t libAddr, const char* name, size_t* sym_size);
 	const char* GlossAddrInfo(uintptr_t sym_addr, size_t* sym_size);
 
-	//memory
+	// memory
 	bool SetMemoryPermission(uintptr_t addr, size_t len, p_flag* type);
 	inline bool Unprotect(uintptr_t addr, size_t len = PAGE_SIZE)
 	{
@@ -97,6 +97,7 @@ extern "C" {
 	void* ReadMemory(void* addr, void* data, size_t size, bool vp = true);
 	void MemoryFill(void* addr, uint8_t value, size_t size, bool vp = true);
 	
+	// hook
 	void* GlossHookSym(void* sym_addr, void* new_func, void** old_func);
 	void* GlossHookAddr(void* func_addr, void* new_func, void** old_func, bool is_short_func, INST_SET);
 	
