@@ -43,7 +43,7 @@ extern "C" {
 		enum e_reg { R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, SP = R13, R14, LR = R14, R15, PC = R15, CPSR };
 
 		uint32_t reg[17];
-		struct { uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, lr, pc, cprs; } regs;
+		struct { uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, lr, pc, cpsr; } regs;
 #elif __aarch64__
 		enum e_reg {
 			X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28, X29, FP = X29,
@@ -55,7 +55,7 @@ extern "C" {
 		struct {
 			uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29;
 			double q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27, q28, q29, q30, q31;
-			uint64_t lr, sp, pc, cprs;
+			uint64_t lr, sp, pc, cpsr;
 		} regs;
 #endif // __arm__
 	};
@@ -78,6 +78,9 @@ extern "C" {
 	uintptr_t GlossSymbolEx(uintptr_t libAddr, const char* name, size_t* sym_size);
 	const char* GlossAddrInfo(uintptr_t sym_addr, size_t* sym_size);
 
+	const char* GlossGetLibMachine(const char* libName);
+	const int GlossGetLibBit(const char* libName);
+
 	// memory
 	bool SetMemoryPermission(uintptr_t addr, size_t len, p_flag* type);
 	inline bool Unprotect(uintptr_t addr, size_t len = PAGE_SIZE)
@@ -97,8 +100,11 @@ extern "C" {
 	void* ReadMemory(void* addr, void* data, size_t size, bool vp = true);
 	void MemoryFill(void* addr, uint8_t value, size_t size, bool vp = true);
 	
-	// hook
-	void* GlossHookSym(void* sym_addr, void* new_func, void** old_func);
+	// inline hook
+	void* GlossHook(void* sym_addr, void* new_func, void** old_func);
+	typedef void (*GlossHookExCallback)(void* hook);
+	void* GlossHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookExCallback call_back_func);
+	
 	void* GlossHookAddr(void* func_addr, void* new_func, void** old_func, bool is_short_func, INST_SET);
 	
 	void* GlossHookBranchB(void* branch_addr, void* new_func, void** old_func, INST_SET);
@@ -112,8 +118,12 @@ extern "C" {
 
 	void* GlossHookRedirect(void* redirect_addr, void* new_addr, INST_SET);
 
-	void* GlossGotHookAddr(void* got_addr, void* new_func, void** old_func);
-	void* GlossGotHookSym(const char* lib_name, const char* sym_name, void* new_func, void** old_func);
+	// got hook
+	void* GlossGotHook(void* got_addr, void* new_func, void** old_func);
+
+	typedef void (*GlossGotHookExCallback)(void* hook);
+	void* GlossGotHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossGotHookExCallback call_back_func);
+	
 	
 	void GlossHookDisable(void* hook);
 	void GlossHookEnable(void* hook);
@@ -160,12 +170,12 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* GOTHook(A addr, B func, C original)
 	{
-		return GlossGotHookAddr(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
+		return GlossGotHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
 	}
 	template <class A, class B>
 	inline static void* GOTHook(A addr, B func)
 	{
-		return GlossGotHookAddr(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
+		return GlossGotHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
 	}
 
 	/*
@@ -174,12 +184,12 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* InlineHook(A addr, B func, C original)
 	{
-		return GlossHookSym(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
+		return GlossHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
 	}
 	template <class A, class B>
 	inline static void* InlineHook(A addr, B func)
 	{
-		return GlossHookSym(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
+		return GlossHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
 	}
 #endif
 #endif
