@@ -23,10 +23,17 @@
 # Compiled Static libraries
 *.lai
 *.la
-# *.a
+*.a
 *.lib
 
 # Executables
-# *.exe
+*.exe
 *.out
 *.app
+
+# dir
+libs/
+obj/
+examples/**/**/GlossHook
+
+.
