@@ -13,7 +13,7 @@ LOCAL_SRC_FILES := GlossHookExample.cpp
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)
 LOCAL_STATIC_LIBRARIES := libGlossHook
 LOCAL_CXXFLAGS += -O0 -mthumb -Wall
-LOCAL_CONLYFLAGS := -std=c++17
+LOCAL_CXXONLYFLAGS := -std=c++17
 LOCAL_LDLIBS += -landroid -llog -ldl
 # LOCAL_ARM_MODE := arm
 
