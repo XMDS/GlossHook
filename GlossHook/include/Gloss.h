@@ -80,6 +80,8 @@ extern "C" {
 	const char* GlossGetLibMachine(const char* libName);
 	const int GlossGetLibBit(const char* libName);
 
+	uintptr_t GlossGetLibSection(const char* libName, const char* sec_name, size_t* sec_size);
+
 	// memory
 	bool SetMemoryPermission(uintptr_t addr, size_t len, p_flag* type);
 	inline bool Unprotect(uintptr_t addr, size_t len)
@@ -117,7 +119,7 @@ extern "C" {
 	// got hook
 	void* GlossGotHook(void* got_addr, void* new_func, void** old_func);
 
-	// per inline/got hook
+	// pre inline/got hook
 	typedef void (*GlossHookCallback)(void* hook);
 	void* GlossHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 	void* GlossGotHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
