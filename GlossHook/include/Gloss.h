@@ -75,7 +75,7 @@ extern "C" {
 
 	uintptr_t GlossSymbol(gloss_lib handle, const char* name, size_t* sym_size);
 	uintptr_t GlossSymbolEx(uintptr_t libAddr, const char* name, size_t* sym_size);
-	const char* GlossAddrInfo(uintptr_t sym_addr, size_t* sym_size);
+	const char* GlossAddr(uintptr_t sym_addr, size_t* sym_size);
 
 	const char* GlossGetLibMachine(const char* libName);
 	const int GlossGetLibBit(const char* libName);
