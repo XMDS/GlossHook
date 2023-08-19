@@ -3,19 +3,40 @@
 
 #include "Gloss.h"
 
+#ifdef __arm__
+#define GLOSS_WRITE_T32(addr, inst) \
+		do { \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (".thumb\n" inst "\n"); }, sizeof(uint32_t)); \
+		} while (0)
+
+#define GLOSS_WRITE_T16(addr, inst) \
+		do { \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (".thumb\n" inst "\n"); }, sizeof(uint16_t)); \
+		} while (0)
+
+#define GLOSS_WRITE_A32(addr, inst) \
+		do { \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (".arm\n" inst "\n"); }, sizeof(uint32_t)); \
+		} while (0)
+#elif __aarch64__
+#define GLOSS_WRITE_A64(addr, inst) \
+		do { \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (inst "\n"); }, sizeof(uint64_t)); \
+		} while (0)
+#endif // __arm__
+
 namespace Gloss {
 
 	namespace Inst {
 		
 		enum class conds { EQ, NE, CS, HS = CS, CC, LO = CC, MI, PL, VS, VC, HI, LS, GE, LT, GT, LE, AL, NV, MAX_COND };
-		
+
 		const int CheckAbsoluteJump(uintptr_t addr);
 		const int CheckRelativeJump(uintptr_t addr);
 
 #ifdef __arm__
 
 		bool IsThumb32(uint32_t addr);
-		int GetThumb32Count(uint32_t addr) noexcept;
 
 		void MakeThumb16NOP(uint32_t addr, size_t size);
 		void MakeThumb32NOP(uint32_t addr, size_t size);
@@ -60,12 +81,7 @@ namespace Gloss {
 
 #endif // __arm__
 
-		
+		const int WriteByte(uintptr_t addr, void (*inst_func)(), size_t len);
 	}
 }
 #endif // !__GLOSSHOOK_INST_H__
-
-
-
-
-
