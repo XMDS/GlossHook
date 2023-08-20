@@ -219,7 +219,7 @@ extern "C" {
 #define GLOSS_WRITE_A64(addr, inst) \
 		do { \
 		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("aarch64"))) {  \
-			__asm volatile (".arm64" inst "\n"); }, sizeof(uint32_t)); \
+			__asm volatile (".arm64\n" inst "\n"); }, sizeof(uint32_t)); \
 		} while (0)
 #endif // __arm__
 
