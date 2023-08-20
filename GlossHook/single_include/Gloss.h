@@ -200,25 +200,29 @@ extern "C" {
 #ifdef __arm__
 #define GLOSS_WRITE_T32(addr, inst) \
 		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (".thumb\n" inst "\n"); }, sizeof(uint32_t)); \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("thumb"))) {  \
+			__asm volatile (".thumb\n" inst "\n"); }, sizeof(uint32_t)); \
 		} while (0)
 
 #define GLOSS_WRITE_T16(addr, inst) \
 		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (".thumb\n" inst "\n"); }, sizeof(uint16_t)); \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("thumb"))) {  \
+			__asm volatile (".thumb\n" inst "\n"); }, sizeof(uint16_t)); \
 		} while (0)
 
 #define GLOSS_WRITE_A32(addr, inst) \
 		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (".arm\n" inst "\n"); }, sizeof(uint32_t)); \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("arm"))) {  \
+			__asm volatile (".arm\n" inst "\n"); }, sizeof(uint32_t)); \
 		} while (0)
 #elif __aarch64__
 #define GLOSS_WRITE_A64(addr, inst) \
 		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() { __asm volatile (inst "\n"); }, sizeof(uint64_t)); \
+		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("aarch64"))) {  \
+			__asm volatile (".arm64" inst "\n"); }, sizeof(uint32_t)); \
 		} while (0)
 #endif // __arm__
-	
+
 	namespace Gloss {
 
 		namespace Inst {
