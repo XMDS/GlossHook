@@ -21,7 +21,7 @@ extern "C" {
 #define GET_INST_SET(addr) (addr & 1 ? i_set::$THUMB : i_set::$ARM)
 #endif // __arm__
 	
-	typedef enum { NONE = 0, $THUMB, $ARM, $ARM64 } i_set; //InstructionSet
+	typedef enum { $NONE = 0, $THUMB, $ARM, $ARM64 } i_set; //InstructionSet
 	typedef void* gloss_lib;
 	typedef struct PermissionFlags
 	{
