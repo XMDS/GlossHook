@@ -89,11 +89,11 @@ extern "C" {
 		return SetMemoryPermission(addr, len, NULL);
 	}
 
-	bool GetMemoryPermission(uintptr_t addr, p_flag* type, pid_t pid);
+	bool GetMemoryPermission(const char* libName, pid_t pid, uintptr_t addr, p_flag* type);
 	inline bool IsAddrExecute(uintptr_t addr)
 	{
 		p_flag type = { 0,0,0 };
-		GetMemoryPermission(addr, &type, -1);
+		GetMemoryPermission(NULL, -1, addr, &type);
 		return type.bExecute;
 	}
 	
