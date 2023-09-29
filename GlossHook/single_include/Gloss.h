@@ -75,7 +75,7 @@ extern "C" {
 
 	uintptr_t GlossSymbol(gloss_lib handle, const char* name, size_t* sym_size);
 	uintptr_t GlossSymbolEx(uintptr_t libAddr, const char* name, size_t* sym_size);
-	const char* GlossAddr(uintptr_t sym_addr, size_t* sym_size);
+	const char* GlossAddr(uintptr_t libAddr, uintptr_t* sym_addr, size_t* sym_size);
 
 	const char* GlossGetLibMachine(const char* libName);
 	const int GlossGetLibBit(const char* libName);
@@ -114,7 +114,7 @@ extern "C" {
 	typedef void (*GlossHookPatchCallback)(gloss_reg* regs, void* hook);
 	void* GlossHookPatch(void* patch_addr, GlossHookPatchCallback new_func, bool is_short_func, i_set mode);
 
-	void* GlossHookRedirect(void* redirect_addr, void* new_addr, i_set mode);
+	void* GlossHookRedirect(void* redirect_addr, void* new_addr, bool is_short_func, i_set mode);
 
 	// got hook
 	void* GlossGotHook(void* got_addr, void* new_func, void** old_func);
