@@ -61,21 +61,21 @@ extern "C" {
 	} gloss_reg;
 
 	// library
-	uintptr_t GlossGetLibBase(const char* libName, pid_t pid);
-	size_t GlossGetLibLength(const char* libName, pid_t pid);
-	uintptr_t GlossGetLibBias(const char* libName);
-	uintptr_t GlossGetLibBiasEx(gloss_lib handle);
+	uintptr_t GlossGetLibBaseInfo(const char* lib_name, pid_t pid, char* lib_path, size_t* lib_mem_len);
 
-	gloss_lib GlossOpen(const char* libName);
+	gloss_lib GlossOpen(const char* lib_name);
 	int GlossClose(gloss_lib handle, bool is_dlclose);
-
+	
+	uintptr_t GlossGetLibBias(const char* lib_name);
+	uintptr_t GlossGetLibBiasEx(gloss_lib handle);
+	
 	const char* GlossGetLibPath(gloss_lib handle);
-	const char* GlossGetLibPathEx(uintptr_t libAddr);
-	size_t GlossGetLibFileSize(const char* libName);
+	bool GlossGetLibPathEx(uintptr_t lib_addr, char* path);
+	size_t GlossGetLibFileSize(const char* lib_name);
 
 	uintptr_t GlossSymbol(gloss_lib handle, const char* name, size_t* sym_size);
-	uintptr_t GlossSymbolEx(uintptr_t libAddr, const char* name, size_t* sym_size);
-	const char* GlossAddr(uintptr_t libAddr, uintptr_t* sym_addr, size_t* sym_size);
+	uintptr_t GlossSymbolEx(uintptr_t lib_addr, const char* name, size_t* sym_size);
+	bool GlossAddr(uintptr_t lib_addr, uintptr_t* sym_addr, size_t* sym_size, char* sym_name);
 
 	const char* GlossGetLibMachine(const char* libName);
 	const int GlossGetLibBit(const char* libName);
@@ -88,12 +88,12 @@ extern "C" {
 	{
 		return SetMemoryPermission(addr, len, NULL);
 	}
-
-	bool GetMemoryPermission(const char* libName, pid_t pid, uintptr_t addr, p_flag* type);
+	
+	bool GetMemoryPermission(uintptr_t addr, p_flag* type, pid_t pid, const char* lib_name);
 	inline bool IsAddrExecute(uintptr_t addr)
 	{
 		p_flag type = { 0,0,0 };
-		GetMemoryPermission(NULL, -1, addr, &type);
+		GetMemoryPermission(addr, &type, -1, NULL);
 		return type.bExecute;
 	}
 	
@@ -101,20 +101,23 @@ extern "C" {
 	void* ReadMemory(void* addr, void* data, size_t size, bool vp);
 	void MemoryFill(void* addr, uint8_t value, size_t size, bool vp);
 	
-	// inline hook
+	// inline hook function head
 	void* GlossHook(void* sym_addr, void* new_func, void** old_func);
-	void* GlossHookAddr(void* func_addr, void* new_func, void** old_func, bool is_short_func, i_set mode);
+	void* GlossHookAddr(void* func_addr, void* new_func, void** old_func, bool is_4_byte_hook, i_set mode);
 	
+	// inline hook branch B/BL/BLX
 	void* GlossHookBranchB(void* branch_addr, void* new_func, void** old_func, i_set mode);
 	void* GlossHookBranchBL(void* branch_addr, void* new_func, void** old_func, i_set mode);
 #ifdef __arm__
 	void* GlossHookBranchBLX(void* branch_addr, void* new_func, void** old_func, i_set mode);
 #endif // __arm__
 
-	typedef void (*GlossHookPatchCallback)(gloss_reg* regs, void* hook);
-	void* GlossHookPatch(void* patch_addr, GlossHookPatchCallback new_func, bool is_short_func, i_set mode);
+	// inline hook internal any position
+	typedef void (*GlossHookInternalCallback)(gloss_reg* regs, void* hook);
+	void* GlossHookInternal(void* addr, GlossHookInternalCallback new_func, bool is_4_byte_hook, i_set mode);
 
-	void* GlossHookRedirect(void* redirect_addr, void* new_addr, bool is_short_func, i_set mode);
+	// inline hook redirect code
+	void* GlossHookRedirect(void* redirect_addr, void* new_addr, bool is_4_byte_hook, i_set mode);
 
 	// got hook
 	void* GlossGotHook(void* got_addr, void* new_func, void** old_func);
@@ -123,6 +126,9 @@ extern "C" {
 	typedef void (*GlossHookCallback)(void* hook);
 	void* GlossHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 	void* GlossGotHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
+
+	// hook .init_array/.init / hook constructor
+	void* GlossHookConstructor(const char* lib_name, void* offset_addr, void* new_func, void** old_func, bool is_4_byte_hook, i_set mode, GlossHookCallback call_back_func);
 	
 	// Disable/Enable/Delete
 	void GlossHookDisable(void* hook);
