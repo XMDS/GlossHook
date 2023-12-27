@@ -65,10 +65,10 @@ extern "C" {
 
 	gloss_lib GlossOpen(const char* lib_name);
 	int GlossClose(gloss_lib handle, bool is_dlclose);
-	
+
 	uintptr_t GlossGetLibBias(const char* lib_name);
 	uintptr_t GlossGetLibBiasEx(gloss_lib handle);
-	
+
 	const char* GlossGetLibPath(gloss_lib handle);
 	bool GlossGetLibPathEx(uintptr_t lib_addr, char* path);
 	size_t GlossGetLibFileSize(const char* lib_name);
@@ -88,7 +88,7 @@ extern "C" {
 	{
 		return SetMemoryPermission(addr, len, NULL);
 	}
-	
+
 	bool GetMemoryPermission(uintptr_t addr, p_flag* type, pid_t pid, const char* lib_name);
 	inline bool IsAddrExecute(uintptr_t addr)
 	{
@@ -96,15 +96,15 @@ extern "C" {
 		GetMemoryPermission(addr, &type, -1, NULL);
 		return type.bExecute;
 	}
-	
+
 	void WriteMemory(void* addr, void* data, size_t size, bool vp);
 	void* ReadMemory(void* addr, void* data, size_t size, bool vp);
 	void MemoryFill(void* addr, uint8_t value, size_t size, bool vp);
-	
+
 	// inline hook function head
 	void* GlossHook(void* sym_addr, void* new_func, void** old_func);
 	void* GlossHookAddr(void* func_addr, void* new_func, void** old_func, bool is_4_byte_hook, i_set mode);
-	
+
 	// inline hook branch B/BL/BLX
 	void* GlossHookBranchB(void* branch_addr, void* new_func, void** old_func, i_set mode);
 	void* GlossHookBranchBL(void* branch_addr, void* new_func, void** old_func, i_set mode);
@@ -122,14 +122,18 @@ extern "C" {
 	// got hook
 	void* GlossGotHook(void* got_addr, void* new_func, void** old_func);
 
+	// enable pre inline/got hook  hook .init_array/.init / hook constructor
+	// used in __attribute__((constructor)) function eg: __attribute__((constructor)) void GlossHookInit() { GlossInitEnablePreHook(); }
+	__attribute__((weak)) void GlossInitEnablePreHook();
+
 	// pre inline/got hook
 	typedef void (*GlossHookCallback)(void* hook);
 	void* GlossHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 	void* GlossGotHookEx(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 
-	// hook .init_array/.init / hook constructor
+	// pre inline hook .init_array/.init / hook constructor
 	void* GlossHookConstructor(const char* lib_name, void* offset_addr, void* new_func, void** old_func, bool is_4_byte_hook, i_set mode, GlossHookCallback call_back_func);
-	
+
 	// Disable/Enable/Delete
 	void GlossHookDisable(void* hook);
 	void GlossHookEnable(void* hook);
@@ -238,7 +242,7 @@ extern "C" {
 			const int CheckAbsoluteJump(uintptr_t addr);
 			const int CheckRelativeJump(uintptr_t addr);
 
-			enum class branchs { B_COND, B_16, B_32, BL, BLX, MAX_BRANCH };
+			enum class branchs { B_COND16, B_COND, B_16, B, BL, BLX, MAX_BRANCH };
 			const branchs GetBranch(uintptr_t addr, i_set mode);
 
 #ifdef __arm__
