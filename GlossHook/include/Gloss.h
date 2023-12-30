@@ -171,7 +171,7 @@ extern "C" {
 	template <typename T1>
 	inline static T1 ReadMemory(uintptr_t addr, bool vp = true)
 	{
-		if (vp) Unprotect((uintptr_t)addr, sizeof(T1));
+		if (vp) Unprotect(addr, sizeof(T1));
 		return *reinterpret_cast<T1*>(addr);
 	}
 
