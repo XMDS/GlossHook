@@ -79,8 +79,9 @@ extern "C" {
 
 	const char* GlossGetLibMachine(const char* libName);
 	const int GlossGetLibBit(const char* libName);
-
+	
 	uintptr_t GlossGetLibSection(const char* libName, const char* sec_name, size_t* sec_size);
+	uintptr_t GlossGetLibSegment(const char* libName, unsigned int seg_type, size_t* seg_size);
 
 	// memory
 	bool SetMemoryPermission(uintptr_t addr, size_t len, p_flag* type);
