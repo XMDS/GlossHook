@@ -20,7 +20,7 @@ extern "C" {
 #ifdef __arm__
 #define GET_INST_SET(addr) (addr & 1 ? i_set::$THUMB : i_set::$ARM)
 #endif // __arm__
-	
+
 	typedef enum { $NONE = 0, $THUMB, $ARM, $ARM64 } i_set; //InstructionSet
 	typedef void* gloss_lib;
 	typedef struct PermissionFlags
@@ -61,7 +61,7 @@ extern "C" {
 	} gloss_reg;
 
 	// library
-	uintptr_t GlossGetLibBaseInfo(const char* lib_name, pid_t pid, char* lib_path, size_t* lib_mem_len);
+	uintptr_t GlossGetLibInfo(const char* lib_name, pid_t pid, char* lib_path, size_t* lib_mem_len);
 
 	gloss_lib GlossOpen(const char* lib_name);
 	int GlossClose(gloss_lib handle, bool is_dlclose);
@@ -79,7 +79,7 @@ extern "C" {
 
 	const char* GlossGetLibMachine(const char* libName);
 	const int GlossGetLibBit(const char* libName);
-	
+
 	uintptr_t GlossGetLibSection(const char* libName, const char* sec_name, size_t* sec_size);
 	uintptr_t GlossGetLibSegment(const char* libName, unsigned int seg_type, size_t* seg_size);
 
@@ -123,9 +123,63 @@ extern "C" {
 	// got hook
 	void* GlossGotHook(void* got_addr, void* new_func, void** old_func);
 
-	// enable pre inline/got hook  hook .init_array/.init / hook constructor
-	// used in __attribute__((constructor)) function eg: __attribute__((constructor)) void GlossHookInit() { GlossInitEnablePreHook(); }
-	__attribute__((weak)) void GlossInitEnablePreHook();
+	// linker hook
+	// support function: dlopen, dlsym, other linker(libdl) function
+	union GlossLinkerFuncProxy
+	{
+		struct GlossDlopenProxy
+		{
+			// API Level 23 (Android 6.0) and below
+			void* (*dlopen)(const char* filename, int flags);
+			void** orig_dlopen;
+			// API Level 21 - 23 (Android 5.x - 6.0) Only
+			void* (*android_dlopen_ext)(const char* filename, int flags, const void* extinfo);
+			void** orig_android_dlopen_ext;
+
+			// API Level 24 - 25 (Android 7.x)
+			void* (*do_dlopen_n)(const char* name, int flags, const void* extinfo, void* caller_addr);
+			void** orig_do_dlopen_n;
+
+			// API Level 26 - 27 (Android 8.x)
+			void* (*do_dlopen_o)(const char* name, int flags, const void* extinfo, const void* caller_addr);
+			void** orig_do_dlopen_o;
+
+			// API Level 28 (Android 9.0) and above
+			void* (*__loader_dlopen)(const char* filename, int flags, const void* caller_addr);
+			void* (*__loader_android_dlopen_ext)(const char* filename, int flags, const void* extinfo, const void* caller_addr);
+			void** orig__loader_dlopen;
+			void** orig__loader_android_dlopen_ext;
+		} DlopenProxy;
+
+		struct GlossDlsymProxy
+		{
+			// API Level 23 (Android 6.0) and below
+			void* (*dlsym)(void* handle, const char* symbol);
+			void** orig_dlsym;
+
+			// API Level 24 - 25 (Android 7.x)
+			bool (*do_dlsym)(void* handle, const char* sym_name, const char* sym_ver, void* caller_addr, void** symbol);
+			void** orig_do_dlsym;
+
+			// API Level 26 (Android 8.0) and above
+			void* (*__loader_dlsym)(void* handle, const char* symbol, const void* caller_addr);
+			void* (*__loader_dlvsym)(void* handle, const char* symbol, const char* version, const void* caller_addr);
+			void** orig__loader_dlsym;
+			void** orig__loader_dlvsym;
+		} DlsymProxy;
+
+		// Other Linker Function
+		struct GlossFuncProxy
+		{
+			void* linker_func;
+			void** orig_linker_func;
+		} FuncProxy;
+	};
+	// dlfuc: dlopen, dlsym, and symbol name
+	// new_dlfunc: see GlossLinkerFuncProxy
+	// hook: return hook pointer (__loader_dlopen, __loader_dlsym)
+	// hook2: return hook2 pointer （__loader_android_dlopen_ext, __loader_dlvsym）
+	bool GlossLinkerHook(const char* dlfunc, GlossLinkerFuncProxy new_dlfunc, void** hook, void** hook2);
 
 	// pre inline/got hook
 	typedef void (*GlossHookCallback)(void* hook);
@@ -180,12 +234,12 @@ extern "C" {
 	* GOTHook template, complete type conversion.
 	*/
 	template <class A, class B, class C>
-	inline static void* GOTHook(A addr, B func, C original)
+	inline static void* GotHook(A addr, B func, C original)
 	{
 		return GlossGotHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), reinterpret_cast<void**>(original));
 	}
 	template <class A, class B>
-	inline static void* GOTHook(A addr, B func)
+	inline static void* GotHook(A addr, B func)
 	{
 		return GlossGotHook(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), NULL);
 	}

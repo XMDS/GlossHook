@@ -1,1 +1,2 @@
-ndk-build NDK_LOG=1
+call ndk-build NDK_LOG=1
+pause
