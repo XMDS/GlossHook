@@ -955,7 +955,7 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* InlineHookA(A addr, B func, C old)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -966,7 +966,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* InlineHookA(A addr, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -977,7 +977,7 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* InlineHookA(const char* library, A offset, B func, C old)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -988,7 +988,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* InlineHookA(const char* library, A offset, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1001,7 +1001,7 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* InlineHookA4(A addr, B func, C old)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1012,7 +1012,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* InlineHookA4(A addr, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1023,7 +1023,7 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* InlineHookA4(const char* library, A offset, B func, C old)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1034,7 +1034,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* InlineHookA4(const char* library, A offset, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1107,7 +1107,7 @@ extern "C" {
 	template <class A, class B, class C>
 	inline static void* BLHookA(A addr, B func, C old)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1118,7 +1118,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* BLHookA(A addr, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1181,7 +1181,7 @@ extern "C" {
 	template <class A>
 	inline static void* AnyHookA(A addr, GlossHookInternalCallback func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1192,7 +1192,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* AnyHookA(A addr, GlossHookInternalCallback func, B ret)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1205,7 +1205,7 @@ extern "C" {
 	template <class A>
 	inline static void* AnyHookA4(A addr, GlossHookInternalCallback func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1216,7 +1216,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* AnyHookA4(A addr, GlossHookInternalCallback func, B ret)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1255,7 +1255,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* RedirectA(A addr, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1266,7 +1266,7 @@ extern "C" {
 	template <class A, class B>
 	inline static void* RedirectA4(A addr, B func)
 	{
-		static constexpr i_set mode =
+		constexpr i_set mode =
 #ifdef __arm__
 			$ARM;
 #else
@@ -1275,6 +1275,8 @@ extern "C" {
 		return GlossHookRedirect(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(func), true, mode);
 	}
 
+
+// *********************************************************** Inst API ******************************************************************************
 // GlossHook Inst.h
 #ifndef __GLOSSHOOK_INST_H__
 #define __GLOSSHOOK_INST_H__
@@ -1305,7 +1307,7 @@ extern "C" {
 		} while (0)
 #endif // __arm__
 	
-	namespace GLOSS_API Gloss {
+	namespace Gloss {
 		namespace Inst {
 			
 			// conditions type
@@ -1477,7 +1479,7 @@ extern "C" {
 			* @param dest - The branch destination.
 			* @param reg - The condition register. (see gloss_reg::e_reg)
 			* @param is_cbnz - True if the instruction is CBNZ, otherwise CBZ.
-			* @param is64 - True if the instruction is 64bit, otherwise 32bit.
+			* @param is64 - True if the register is 64bit, otherwise 32bit.
 			* @return - The conditional branch instruction.
 			*/
 			GLOSS_API uint32_t MakeArm64CB(uint64_t addr, uint64_t dest, uint8_t reg, bool is_cbnz, bool is64);
@@ -1492,7 +1494,8 @@ extern "C" {
 			*/
 			GLOSS_API int8_t MakeArm64AbsoluteJump(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // unlimited
 			GLOSS_API int8_t MakeArm64AbsoluteJump32(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // 4g limit
-			GLOSS_API int8_t MakeArm64AbsoluteJumpRet(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // ret
+			GLOSS_API int8_t MakeArm64AbsoluteJumpRet(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // unlimited
+			GLOSS_API int8_t MakeArm64AbsoluteJump128(uint64_t addr, uint64_t dest); // unlimited
 
 			/*
 			* GetBranchDestination - Get branch destination. (aarch64)
