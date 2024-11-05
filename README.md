@@ -3,11 +3,13 @@ A simple Android arm Hook library.
 
 ## English
 Features:
+- Support Android 5.0 - 14.0
+
 - Support for Android Thumb/ARM/ARM64 architectures.
 
-- Implementation of Inline Hook and GotHook (not PLT Hook).
+- Implementation of Inline Hook and Got/Plt Hook
 
-- Support for hooking a single branch instruction (B, BL, BLX) calling a function. Sometimes you may only need to hook one specific call site of a function, rather than all call sites.
+- Support for hooking a single branch instruction (BL, BLX) calling a function. Sometimes you may only need to hook one specific call site of a function, rather than all call sites.
 
 - Support for hooking short functions (minimum 4 bytes).
 
@@ -28,13 +30,14 @@ Features:
 - Provides common API functions for library lookup, library information, symbol address retrieval, memory read/write, and memory permission removal, etc.
 
 ## 中文说明
-一个简易、功能多的安卓arm hook库.
-GlossHook目前只是一个arm的分支版本，待以后更新(目前兼容性不敢保证)，但基本上可以使用.
+一个适用于安卓游戏MOD制作的armHook库.
 
 ### 特性
-* 支持thumb/arm/arm64的InlineHook和GotHook(不是PLT Hook).
+* 支持安卓5.0到14.0.
 
-* 支持对单个分支指令(B BL BLX)调用函数的hook，有时候你可能只需要hook其中一处调用点，而不是函数的全部调用点.
+* 支持thumb/arm/arm64的InlineHook和Got/Plt Hook
+
+* 支持对单个分支指令(BL BLX)调用函数的hook，有时候你可能只需要hook其中一处调用点，而不是函数的全部调用点.
 
 * 支持短函数Hook(最短4字节函数).
 
