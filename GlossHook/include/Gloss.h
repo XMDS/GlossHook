@@ -48,17 +48,19 @@ extern "C" {
 	{
 		// pc register cannot be changed, only read
 #ifdef __arm__
-		enum e_reg { R0 = 0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, FP = R11, R12, IP = R12, R13, SP = R13, R14, LR = R14, R15, PC = R15, CPSR };
+		enum e_reg { R0 = 0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, FP = R11, R12, IP = R12, R13, SP = R13, R14, LR = R14, R15, PC = R15, CPSR, MAX_REG };
 
 		union {
-			uint32_t r[17];
+			uint32_t r[MAX_REG];
 			struct { uint32_t r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, sp, lr, pc, cpsr; } regs;
 		};
 #elif __aarch64__
 		enum e_reg {
 			X0 = 0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15, X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28, X29, FP = X29,
-			Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10, Q11, Q12, Q13, Q14, Q15, Q16, Q17, Q18, Q19, Q20, Q21, Q22, Q23, Q24, Q25, Q26, Q27, Q28, Q29, Q30, Q31,
-			X30, LR = X30, X31, SP = X31, PC, CPSR
+			X30, LR = X30, X31, SP = X31, PC, CPSR, MAX_REG,
+			Q0 = X0, Q1 = X1, Q2 = X2, Q3 = X3, Q4 = X4, Q5 = X5, Q6 = X6, Q7 = X7, Q8 = X8, Q9 = X9, Q10 = X10, Q11 = X11, Q12 = X12, Q13 = X13, Q14 = X14, Q15 = X15,
+			Q16 = X16, Q17 = X17, Q18 = X18, Q19 = X19, Q20 = X20, Q21 = X21, Q22 = X22, Q23 = X23, Q24 = X24, Q25 = X25, Q26 = X26, Q27 = X27, Q28 = X28, Q29 = X29, Q30 = X30, Q31 = X31,
+			MAX_Q_REG
 		};
 
 		typedef union {
@@ -67,17 +69,21 @@ extern "C" {
 			float f[4];
 		} __qreg;
 
+		typedef union {
+			uint64_t x;
+			uint32_t w[2];
+		} __xreg;
+
 		union {
 			struct {
-				uint64_t x[30];
-				__uint128_t q[32];
-				uint64_t p[4];
+				__uint128_t q[MAX_Q_REG];
+				uint64_t x[MAX_REG];
 			} r;
 
 			struct {
-				uint64_t x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29;
 				__qreg q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27, q28, q29, q30, q31;
-				uint64_t lr, sp, pc, cpsr;
+				__xreg x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20, x21, x22, x23, x24, x25, x26, x27, x28, x29;
+				__xreg lr, sp; uint64_t pc, cpsr;
 			} regs;
 		};
 #endif // __arm__
@@ -820,23 +826,23 @@ extern "C" {
 	/*
 	* Write any type of value to memory.
 	*/
-	template <typename T1>
-	inline static void WriteMemory(uintptr_t addr, T1 value, bool vp = true)
+	template <typename T>
+	inline static void WriteMemory(uintptr_t addr, T value, bool vp = true)
 	{
-		WriteMemory(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&value), sizeof(T1), vp);
+		WriteMemory(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&value), sizeof(T), vp);
 	}
 
 	/*
 	* Read any type of value from memory.
 	*/
-	template <typename T1>
-	inline static T1 ReadMemory(uintptr_t addr, bool vp = true)
+	template <typename T>
+	inline static T ReadMemory(uintptr_t addr, bool vp = true)
 	{
-		T1 value;
-		ReadMemory(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&value), sizeof(T1), vp);
+		T value;
+		ReadMemory(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&value), sizeof(T), vp);
 		return value;
 	}
-
+	
 	// Plt/Got Hook template, complete type conversion.
 	template <class A, class B, class C>
 	inline static void* GotHook(A addr, B func, C old)
