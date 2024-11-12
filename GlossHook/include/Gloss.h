@@ -666,7 +666,7 @@ extern "C" {
 	* @param new_dlfunc - The new linker function to hook, see GlossLinkerFuncProxy. (Cannot use NULL)
 	* @return The hook handle. (failed: NULL)
 	*/
-	GLOSS_API void* GlossLinkerHook(const char* dlfunc, GlossLinkerFuncProxy new_dlfunc);
+	GLOSS_API GHook GlossLinkerHook(const char* dlfunc, GlossLinkerFuncProxy new_dlfunc);
 
 	/*
 	* GlossHookCallback_t - The callback function when the Hook becomes effective.
@@ -699,7 +699,7 @@ extern "C" {
 	* @param call_back_func - The callback function when the hook is triggered, see GlossHookCallback_t. (Can be NULL)
 	* @return The hook handle. (failed: NULL)
 	*/
-	GLOSS_API void* GlossHookByName(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
+	GLOSS_API GHook GlossHookByName(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 
 	/*
 	* GlossPltHook - Hook Global Offset Table by symbol name
@@ -715,7 +715,7 @@ extern "C" {
 	* @param call_back_func - The callback function when the hook is triggered, see GlossHookCallback_t. (Can be NULL)
 	* @return The hook handle. (failed: NULL)
 	*/
-	GLOSS_API void* GlossPltHook(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
+	GLOSS_API GHook GlossPltHook(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 
 	/*
 	* GlossHookConstructor - Inline hook constructor function.
