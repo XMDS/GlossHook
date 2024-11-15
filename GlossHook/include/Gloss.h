@@ -454,7 +454,7 @@ extern "C" {
 	// and there are other methods to solve the re-entry problem, such as using a bool variable to check the hook status, or use atomic variables.
 	// GlossHook also provides a solution:
 	//
-	// void* hook_handle = nullptr;      // hook handle
+	// GHook hook_handle = nullptr;      // hook handle
 	// void* (*old_malloc)(size_t size); // old_func to store
 	// void* my_malloc(size_t size)      // new_func
 	// {
