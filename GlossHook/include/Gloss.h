@@ -557,7 +557,7 @@ extern "C" {
 	* @param regs - The register information, see gloss_reg.
 	* @param hook - The hook handle.
 	*/
-	typedef void (*GlossHookInternalCallback)(gloss_reg* regs, void* hook);
+	typedef void (*GlossHookInternalCallback)(gloss_reg* regs, GHook hook);
 	/*
 	* GlossHookInternal - Inline hook executable code at any position, accessing register and stack information.
 	*
