@@ -47,6 +47,7 @@ extern "C" {
 	typedef struct GlossRegister
 	{
 		// pc register cannot be changed, only read
+		// x18 register is occupied by a jump instruction, cannot be changed
 #ifdef __arm__
 		enum e_reg { R0 = 0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, FP = R11, R12, IP = R12, R13, SP = R13, R14, LR = R14, R15, PC = R15, CPSR, MAX_REG };
 
@@ -565,7 +566,7 @@ extern "C" {
 	*
 	* B instructions have jump range limitations. GlossHook will allocate free memory within the range of the shared object (SO) to create a trampoline.
 	* The nearby memory space of the SO is limited, which can also lead to hook failures. (see { GlossHookAddTrampolines })
-	* 
+	*
 	* If ret_addr is set, it may break the ability to hook the address multiple times.
 	*
 	* @param addr - The address to hook. (Cannot use NULL)
@@ -661,7 +662,7 @@ extern "C" {
 	* To implement hooking dl series functions, some special processing is done, and a separate API is provided to hook dl series functions.
 	* Support hooking all symbols functions in the linker and libdl.so. (libdl.so was introduced in Android 8.0)
 	* Android emulators may not be supported.
-	* 
+	*
 	* @param dlfunc - The linker function c/c++ symbol name to hook. (Cannot use NULL)
 	* @param new_dlfunc - The new linker function to hook, see GlossLinkerFuncProxy. (Cannot use NULL)
 	* @return The hook handle. (failed: NULL)
@@ -831,7 +832,7 @@ extern "C" {
 	{
 		WriteMemory(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&value), sizeof(T), vp);
 	}
-
+	
 	/*
 	* Read any type of value from memory.
 	*/
@@ -842,7 +843,7 @@ extern "C" {
 		ReadMemory(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(&value), sizeof(T), vp);
 		return value;
 	}
-	
+
 	// Plt/Got Hook template, complete type conversion.
 	template <class A, class B, class C>
 	inline static void* GotHook(A addr, B func, C old)
@@ -1153,9 +1154,9 @@ extern "C" {
 			* @param reg - The register to store the jump address. (see gloss_reg::e_reg)
 			* @return - The absolute jump instruction byte size.
 			*/
-			GLOSS_API int8_t MakeArm64AbsoluteJump(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // unlimited
-			GLOSS_API int8_t MakeArm64AbsoluteJumpRet(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // unlimited
-			GLOSS_API int8_t MakeArm64AbsoluteJump32(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X17); // 4g limit
+			GLOSS_API int8_t MakeArm64AbsoluteJump(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X18); // unlimited
+			GLOSS_API int8_t MakeArm64AbsoluteJumpRet(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X18); // unlimited
+			GLOSS_API int8_t MakeArm64AbsoluteJump32(uint64_t addr, uint64_t dest, gloss_reg::e_reg reg = gloss_reg::e_reg::X18); // 4g limit
 			GLOSS_API int8_t MakeArm64AbsoluteJump128(uint64_t addr, uint64_t dest); // unlimited
 
 			/*
