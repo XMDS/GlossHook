@@ -89,6 +89,11 @@ extern "C" {
 		};
 #endif // __arm__
 	} gloss_reg;
+	
+	// Enable/Disable GlossHook log
+	// Default: false (disable)
+	// Tag: GLOSS_HOOK
+	GLOSS_API void GlossSetLog(bool enable);
 
 	// ******************************************************* Library API ******************************************************************************
 	//	
