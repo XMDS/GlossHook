@@ -33,7 +33,7 @@ Features:
 一个适用于安卓游戏Mod的ArmHook库.
 
 ### 特性
-* 支持安卓5.0-14.0
+* 支持安卓5.0 ~ 14.0
 
 * 支持Thumb/Arm/Arm64的InlineHook和Plt/GotHook
 
