@@ -35,7 +35,9 @@ Features:
 ### 特性
 * 支持安卓5.0 ~ 14.0
 
-* 支持Thumb/Arm/Arm64的InlineHook和Plt/GotHook
+* 支持Thumb/Arm/Arm64
+
+* 支持InlineHook和PltHook、GotHook
 
 * 支持对单个分支指令(BL BLX)的hook，有时候你可能只需要hook函数其中一处调用点，而不是函数的全部调用点.
 
