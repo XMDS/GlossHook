@@ -39,7 +39,9 @@ Features:
 
 * 支持InlineHook和PltHook、GotHook
 
-* 支持对单个分支指令(BL BLX)的hook，有时候你可能只需要hook函数其中一处调用点，而不是函数的全部调用点.
+* 支持Hook分支指令(BL BLX)，有时候你可能只需要hook函数其中一处调用点，而不是函数的全部调用点
+
+* 能对Linker中dl系列函数进行hook
 
 * 支持短函数Hook，最短4字节函数
 
