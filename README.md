@@ -33,17 +33,21 @@ Features:
 一个适用于安卓游戏Mod的ArmHook库.
 
 ### 特性
-* 支持安卓5.0-14.0
+* 支持安卓5.0 ~ 14.0
 
-* 支持Thumb/Arm/Arm64的InlineHook和Plt/GotHook
+* 支持Thumb/Arm/Arm64
 
-* 支持对单个分支指令(BL BLX)的hook，有时候你可能只需要hook函数其中一处调用点，而不是函数的全部调用点.
+* 支持InlineHook和PltHook、GotHook
+
+* 支持Hook分支指令(BL BLX)，有时候你可能只需要hook函数其中一处调用点，而不是函数的全部调用点
+
+* 能对linker中dl系列函数进行hook
 
 * 支持短函数Hook，最短4字节函数
 
-* 支持对可执行代码任意位置的Hook，在用户函数中可访问Hook位置的全部寄存器，调用任何类型的函数
+* 能Hook可执行代码任意位置，在代理函数中可访问hook位置的全部寄存器，调用任何类型的函数
 
-* Hook后，可回调原函数，也可不回调直接替换函数
+* Hook后，在代理函数内可调用原函数，也可不调用直接替换函数
 
 * 支持对同一个位置的多次hook
 
