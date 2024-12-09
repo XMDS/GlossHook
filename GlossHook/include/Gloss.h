@@ -92,7 +92,7 @@ extern "C" {
 	
 	// Enable/Disable GlossHook log
 	// Default: false (disable)
-	// Tag: GLOSS_HOOK
+	// Tag: GlossHook
 	GLOSS_API void GlossSetLog(bool enable);
 
 	// ******************************************************* Library API ******************************************************************************
@@ -1134,18 +1134,18 @@ extern "C" {
 			* MakeAbsoluteJump - Make absolute jump instruction. (aarch64)
 			*
 			* Inst; (Jump)
-			* addr[0] LDR X17, #8
-			* addr[4] BR X17
+			* addr[0] LDR X18, #8
+			* addr[4] BR X18
 			* addr[8] dest
 			*
 			* Inst; (JumpRet)
-			* addr[0] LDR X17, #8
-			* addr[4] RET X17
+			* addr[0] LDR X18, #8
+			* addr[4] RET X18
 			* addr[8] dest
 			*
 			* Inst; (Jump32)
-			* addr[0] ADRP X17, dest
-			* addr[4] BR X17
+			* addr[0] ADRP X18, dest
+			* addr[4] BR X18
 			*
 			* Inst; (Jump128)
 			* addr[0] STP X1, X0, [SP, #-0x10]
