@@ -30,27 +30,25 @@ Features:
 - Provides common API functions for library lookup, library information, symbol address retrieval, memory read/write, and memory permission removal, etc.
 
 ## 中文说明
-一个适用于安卓游戏Mod的ArmHook库.
+一个安卓ArmHook库，它适用于游戏Mod的制作。
 
 ### 特性
 * 支持安卓5.0 ~ 14.0
 
-* 支持Thumb/Arm/Arm64
-
-* 支持InlineHook和PltHook、GotHook
+* 支持Thumb/Arm/Arm64的InlineHook和PltHook、GotHook
 
 * 支持Hook分支指令(BL BLX)，有时候你可能只需要hook函数其中一处调用点，而不是函数的全部调用点
 
 * 能对linker中dl系列函数进行hook
 
-* 支持短函数Hook，最短4字节函数
+* 支持短函数Hook，最短4字节的函数
 
-* 能Hook可执行代码任意位置，在代理函数中可访问hook位置的全部寄存器，调用任何类型的函数
+* 能Hook可执行代码任意位置，访问该位置的寄存器，插入函数调用
 
-* Hook后，在代理函数内可调用原函数，也可不调用直接替换函数
+* Hook一个函数后，可调用原函数，也可不调用直接替换函数
 
 * 支持对同一个位置的多次hook
 
-* 提供常用的库查找、库信息、获取符号地址、读写内存、解除内存权限等API
+* 提供常用的库查找、获取符号地址、读写内存、解除内存权限等API
 
 * 其它待更新ing
