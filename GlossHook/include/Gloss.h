@@ -591,13 +591,13 @@ extern "C" {
 	* B instructions have jump range limitations. GlossHook will allocate free memory within the range of the shared object (SO) to create a trampoline.
 	* The nearby memory space of the SO is limited, which can also lead to hook failures.
 	*
-	* @param redirect_addr - The address to redirect. (Cannot use NULL)
+	* @param addr - The address to redirect. (Cannot use NULL)
 	* @param new_addr - The new address to redirect. (Cannot use NULL)
 	* @param is_4_byte_hook - Whether to use 4-byte hook. (true: Jump with 4-byte B instruction, false: defautl)
 	* @param mode - The hook mode. (see i_set)
 	* @return The hook handle. (failed: NULL)
 	*/
-	GLOSS_API GHook GlossHookRedirect(void* redirect_addr, void* new_addr, bool is_4_byte_hook, i_set mode);
+	GLOSS_API GHook GlossHookRedirect(void* addr, void* new_addr, bool is_4_byte_hook, i_set mode);
 
 	/*
 	* GlossGotHook - Hook Global Offset Table
