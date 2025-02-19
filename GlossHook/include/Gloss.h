@@ -315,7 +315,7 @@ extern "C" {
 	*/
 	inline bool IsAddrExecute(uintptr_t addr)
 	{
-		p_flag type = { 0,0,0 };
+		p_flag type = { 0,0,0,0,0 };
 		GetMemoryPermission(addr, &type, -1, NULL);
 		return type.bExecute;
 	}
