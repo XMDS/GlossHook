@@ -356,21 +356,24 @@ extern "C" {
 	//
 	/*
 	* GlossInit - Initialize the GlossHook library, Can be re-initialized multiple times.
+	*
+	* @param is_init_linker - Whether to initialize the linker. (AutoEnabled(Default): false)
 	*/
-	GLOSS_API void GlossInit();
+	GLOSS_API void GlossInit(bool is_init_linker);
 	// 
 	// GlossHook some notes:
 	// 
 	// 1. About { GlossInit }
 	// { GlossHook } needs to call the { GlossInit } function once at program startup, which is usually called automatically.
-	// { GlossInit } will allocate memory, find linker symbols, and hook several functions in the Linker.
+	// If the parameter is false, it will allocate some memory. This is necessary; otherwise, GlossHook will not function.
+	// If the parameter is true, it will additionally initialize the linker functionality, obtain linker symbols, and hook linker functions.
 	// Can be initialized multiple times, but only the first time is effective.
-	// In some scenarios, you can manually call it to make your hook more effective.
+	// In some scenarios, you can manually call it to make your hook effective.
 	// For example code:
 	// 
 	// __attribute__((constructor)) void my_entry_func()
 	// {
-	//     GlossInit(); // call GlossInit at program startup
+	//     GlossInit(true); // call GlossInit at program startup
 	//     
 	//     // your code here
 	// }
@@ -695,7 +698,7 @@ extern "C" {
 	* GlossHookByName - Inline hook function head by symbol name.
 	*
 	* @note: If the dynamic library has been loaded, the hook is completed immediately,
-	* otherwise it will be auto hooked when the library is loaded.
+	* otherwise, it will be automatically hooked when the library is loaded in the future, need Enable init linke.(see GlossInit)
 	* Android emulators may not be supported.
 	*
 	* @param lib_name - The library name (or path name) to hook. (Cannot use NULL)
@@ -711,7 +714,7 @@ extern "C" {
 	* GlossPltHook - Hook Global Offset Table by symbol name
 	*
 	* @note: If the dynamic library has been loaded, the hook is completed immediately,
-	* otherwise it will be auto hooked when the library is loaded.
+	* otherwise, it will be automatically hooked when the library is loaded in the future, need Enable init linke.(see GlossInit)
 	* Android emulators may not be supported.
 	*
 	* @param lib_name - The library name (or path name) to hook. (Cannot use NULL)
@@ -727,7 +730,8 @@ extern "C" {
 	* GlossHookConstructor - Inline hook constructor function.
 	*
 	* @note: If the dynamic library has been loaded, the hook is completed immediately,
-	* otherwise it will be hooked when the library is loaded.
+	* otherwise, it will be automatically hooked when the library is loaded in the future, need Enable init linke.(see GlossInit)
+	* Android emulators may not be supported.
 	*
 	* B instructions have jump range limitations. GlossHook will allocate free memory within the range of the shared object (SO) to create a trampoline.
 	* The nearby memory space of the SO is limited, which can also lead to hook failures.
@@ -827,6 +831,14 @@ extern "C" {
 	*/
 	GLOSS_API void* GlossHookGetOriglFunc(GHook hook);
 
+	/*
+	* GlossHookGetInstBuffer - Get the fixed original instruction buffer of the hook.
+	*
+	* @param hook - The hook handle. (Cannot use NULL)
+	* @return The original instruction buffer. (NULL: failed)
+	*/
+	GLOSS_API uint8_t* GlossHookGetInstBuffer(GHook hook);
+
 #ifdef __cplusplus
 }
 	/*
@@ -918,32 +930,6 @@ extern "C" {
 // GlossHook Inst.h
 #ifndef GLOSS_HOOK_INST_H
 #define GLOSS_HOOK_INST_H
-
-#ifdef __arm__
-#define GLOSS_WRITE_T32(addr, inst) \
-		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("thumb"))) {  \
-			__asm volatile (".thumb\n" inst "\n"); }, sizeof(uint32_t)); \
-		} while (0)
-
-#define GLOSS_WRITE_T16(addr, inst) \
-		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("thumb"))) {  \
-			__asm volatile (".thumb\n" inst "\n"); }, sizeof(uint16_t)); \
-		} while (0)
-
-#define GLOSS_WRITE_A32(addr, inst) \
-		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("arm"))) {  \
-			__asm volatile (".arm\n" inst "\n"); }, sizeof(uint32_t)); \
-		} while (0)
-#elif __aarch64__
-#define GLOSS_WRITE_A64(addr, inst) \
-		do { \
-		Gloss::Inst::WriteByte((uintptr_t)addr, []() __attribute__((target("aarch64"))) {  \
-			__asm volatile (".arm64\n" inst "\n"); }, sizeof(uint32_t)); \
-		} while (0)
-#endif
 	
 	namespace Gloss {
 		namespace Inst {
@@ -1175,15 +1161,6 @@ extern "C" {
 			GLOSS_API uint64_t GetArm64BranchDestination(uint64_t addr);
 
 #endif 
-
-			/*
-			* WriteByte - Write assembly instruction to memory.
-			*
-			* @param addr - Address to write instruction.
-			* @param asm_inst_func - The assembly instruction function.
-			* @param len - The length of the instruction.
-			*/
-			GLOSS_API void WriteByte(uintptr_t addr, void (*asm_inst_func)(), size_t len);
 		}
 	}
 #endif
