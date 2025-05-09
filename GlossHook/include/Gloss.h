@@ -832,12 +832,22 @@ extern "C" {
 	GLOSS_API void* GlossHookGetOriglFunc(GHook hook);
 
 	/*
-	* GlossHookGetInstBuffer - Get the fixed original instruction buffer of the hook.
-	*
+	* GlossHookGetInstBuffer - Get the fixed instruction buffer of the hook.
+	* 
 	* @param hook - The hook handle. (Cannot use NULL)
+	* @param len - The fixed instruction len. (Can be NULL)
+	* @return The fixed instruction buffer. (NULL: failed)
+	*/
+	GLOSS_API uint8_t* GlossHookGetInstBuffer(GHook hook, size_t* len);
+	
+	/*
+	* GlossHookGetBackupsBuffer - Get the original instruction buffer of the hook.
+	* 
+	* @param hook - The hook handle. (Cannot use NULL)
+	* @param len - The original instruction len. (Can be NULL)
 	* @return The original instruction buffer. (NULL: failed)
 	*/
-	GLOSS_API uint8_t* GlossHookGetInstBuffer(GHook hook);
+	GLOSS_API uint8_t* GlossHookGetBackupsBuffer(GHook hook, size_t* len);
 
 #ifdef __cplusplus
 }
