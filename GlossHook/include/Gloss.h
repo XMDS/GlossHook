@@ -315,7 +315,7 @@ extern "C" {
 	*/
 	inline bool IsAddrExecute(uintptr_t addr)
 	{
-		p_flag type = { 0,0,0,0,0 };
+		p_flag type = { 0,0,0,0,0,0 };
 		GetMemoryPermission(addr, &type, -1, NULL);
 		return type.bExecute;
 	}
@@ -879,9 +879,7 @@ extern "C" {
 	
 	namespace Gloss {
 		namespace Inst {
-			int CheckAbsoluteJump(uintptr_t addr);
-			int CheckRelativeJump(uintptr_t addr);
-
+		
 			// conditions type
 			enum class Conds { EQ, NE, CS, HS = CS, CC, LO = CC, MI, PL, VS, VC, HI, LS, GE, LT, GT, LE, AL, NV, MAX_COND };
 
