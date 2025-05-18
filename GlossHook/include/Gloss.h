@@ -93,7 +93,7 @@ extern "C" {
 	// Enable/Disable GlossHook log
 	// Default: false (disable)
 	// Tag: GlossHook
-	GLOSS_API void GlossSetLog(bool enable);
+	GLOSS_API void GlossEnableLog(bool enable);
 
 	// ******************************************************* Library API ******************************************************************************
 	//	
@@ -727,7 +727,7 @@ extern "C" {
 	GLOSS_API GHook GlossPltHook(const char* lib_name, const char* sym_name, void* new_func, void** old_func, GlossHookCallback call_back_func);
 
 	/*
-	* GlossHookConstructor - Inline hook constructor function.
+	* GlossHookAddrByName - Inline hook function head by offset address.
 	*
 	* @note: If the dynamic library has been loaded, the hook is completed immediately,
 	* otherwise, it will be automatically hooked when the library is loaded in the future, need Enable init linke.(see GlossInit)
@@ -735,10 +735,9 @@ extern "C" {
 	*
 	* B instructions have jump range limitations. GlossHook will allocate free memory within the range of the shared object (SO) to create a trampoline.
 	* The nearby memory space of the SO is limited, which can also lead to hook failures.
-	* Android emulators may not be supported.
 	*
 	* @param lib_name - The library name (or path name) to hook. (Cannot use NULL)
-	* @param offset_addr - The offset address of the constructor function. (Cannot use NULL)
+	* @param offset_addr - The offset address of the function. (Cannot use NULL)
 	* @param new_func - The new function to hook. (Cannot use NULL)
 	* @param old_func - The old function to store. (Can be NULL)
 	* @param is_4_byte_hook - Whether to use 4-byte hook. (true: Jump with 4-byte B instruction, false: defautl)
@@ -746,7 +745,7 @@ extern "C" {
 	* @param call_back_func - The callback function when the hook is triggered, see GlossHookCallback_t. (Can be NULL)
 	* @return The hook handle. (failed: NULL)
 	*/
-	GLOSS_API GHook GlossHookConstructor(const char* lib_name, uintptr_t offset_addr, void* new_func, void** old_func, bool is_4_byte_hook, i_set mode, GlossHookCallback call_back_func);
+	GLOSS_API GHook GlossHookAddrByName(const char* lib_name, uintptr_t offset_addr, void* new_func, void** old_func, bool is_4_byte_hook, i_set mode, GlossHookCallback call_back_func);
 
 	/*
 	* GlossHookDisable/Enable/Delete - Disable/Enable/Delete hook.
@@ -762,9 +761,9 @@ extern "C" {
 	* @param addr - The address to disable/enable/delete hooks. (Cannot use NULL)
 	* @param mode - The hook mode. (see i_set)
 	*/
-	GLOSS_API void GlossDisableAllHook(void* addr, i_set mode);
-	GLOSS_API void GlossEnableAllHook(void* addr, i_set mode);
-	GLOSS_API void GlossDeleteAllHook(void* addr, i_set mode);
+	GLOSS_API void GlossHookDisableAll(void* addr, i_set mode);
+	GLOSS_API void GlossHookEnableAll(void* addr, i_set mode);
+	GLOSS_API void GlossHookDeleteAll(void* addr, i_set mode);
 
 	/*
 	* GlossHookGetCount - Get the current hook count id.
@@ -832,22 +831,22 @@ extern "C" {
 	GLOSS_API void* GlossHookGetOriglFunc(GHook hook);
 
 	/*
-	* GlossHookGetInstBuffer - Get the fixed instruction buffer of the hook.
+	* GlossHookGetFixedInst - Get the fixed instruction buffer of the hook.
 	* 
 	* @param hook - The hook handle. (Cannot use NULL)
 	* @param len - The fixed instruction len. (Can be NULL)
 	* @return The fixed instruction buffer. (NULL: failed)
 	*/
-	GLOSS_API uint8_t* GlossHookGetInstBuffer(GHook hook, size_t* len);
+	GLOSS_API uint8_t* GlossHookGetFixedInst(GHook hook, size_t* len);
 	
 	/*
-	* GlossHookGetBackupsBuffer - Get the original instruction buffer of the hook.
+	* GlossHookGetBackupsInst - Get the original instruction buffer of the hook.
 	* 
 	* @param hook - The hook handle. (Cannot use NULL)
 	* @param len - The original instruction len. (Can be NULL)
 	* @return The original instruction buffer. (NULL: failed)
 	*/
-	GLOSS_API uint8_t* GlossHookGetBackupsBuffer(GHook hook, size_t* len);
+	GLOSS_API uint8_t* GlossHookGetBackupsInst(GHook hook, size_t* len);
 
 #ifdef __cplusplus
 }
