@@ -30,10 +30,3 @@
 *.exe
 *.out
 *.app
-
-# dir
-libs/
-obj/
-examples/**/**/GlossHook
-
-.
