@@ -5,7 +5,7 @@ GlossHook is utilized by AndroidModLoader and has enabled the creation of a vast
 GlossHook是一个简单、功能多的安卓NativeHook库，适用于安卓游戏修改和模组制作，它也能用于其它场景。
 GlossHook被AndroidModLoader使用，为安卓GTA游戏创建了大量模组，它是稳定的！
 
-[AML](https://github.com/RusJJ/AndroidModLoader.git)
+[AML](https://github.com/RusJJ/AndroidModLoader)
 
 # Features
 ## English
